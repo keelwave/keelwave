@@ -11,10 +11,18 @@ export function AgentPortfolioGrid({ rows }: { rows: RunHealthRow[] }) {
         <Card key={r.agent_name}>
           <CardContent className="flex flex-col gap-2 p-4">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-sm font-medium">{r.agent_name}</span>
-              <DeltaBadge current={r.total_runs} previous={r.prev_total_runs ?? 0} goodWhen="up" />
+              <span className="font-mono text-sm font-medium">
+                {r.agent_name}
+              </span>
+              <DeltaBadge
+                current={r.total_runs}
+                previous={r.prev_total_runs ?? 0}
+                goodWhen="up"
+              />
             </div>
-            <span className="font-mono text-2xl font-semibold">{formatTokens(r.total_runs)}</span>
+            <span className="font-mono text-2xl font-semibold">
+              {formatTokens(r.total_runs)}
+            </span>
             <div className="flex gap-4 text-xs text-muted-foreground">
               <span>{formatPercent(r.completion_rate)} done</span>
               <span>{formatPercent(r.loop_rate)} loop</span>

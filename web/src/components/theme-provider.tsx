@@ -21,10 +21,7 @@ function getThemeScript(storageKey: string, defaultTheme: Theme) {
   return `(function(){try{var t=localStorage.getItem(${key});if(t!=='light'&&t!=='dark'&&t!=='system'){t=${fallback}}var d=matchMedia('(prefers-color-scheme: dark)').matches;var r=t==='system'?(d?'dark':'light'):t;var e=document.documentElement;e.classList.add(r);e.style.colorScheme=r}catch(e){}})();`
 }
 
-const ThemeProviderContext = createContext<ThemeProviderState>({
-  theme: "system",
-  setTheme: () => {},
-})
+const ThemeProviderContext = createContext<ThemeProviderState | null>(null)
 
 function applyTheme(theme: Theme) {
   const root = document.documentElement
@@ -88,7 +85,7 @@ export function ThemeProvider({
 
 export function useTheme() {
   const context = useContext(ThemeProviderContext)
-  if (context === undefined)
+  if (context === null)
     throw new Error("useTheme must be used within a ThemeProvider")
   return context
 }

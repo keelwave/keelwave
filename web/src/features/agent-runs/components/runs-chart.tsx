@@ -50,13 +50,15 @@ function formatLabel(iso: string): string {
 }
 
 export function RunsChart({
+  projectId,
   from,
   bucket = "1h",
 }: {
+  projectId: string | null
   from: string | null
   bucket?: BucketSize
 }) {
-  const series = useRunsTimeseries(from, bucket)
+  const series = useRunsTimeseries(projectId, from, bucket)
 
   return (
     <Card>
@@ -86,7 +88,7 @@ export function RunsChart({
                 content={
                   <ChartTooltipContent
                     labelFormatter={(_, payload) =>
-                      formatLabel(payload?.[0]?.payload?.bucket ?? "")
+                      formatLabel(payload[0]?.payload?.bucket ?? "")
                     }
                   />
                 }

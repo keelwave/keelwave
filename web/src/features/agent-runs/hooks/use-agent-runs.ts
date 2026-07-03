@@ -24,73 +24,94 @@ export interface ListRunsParams {
 
 export const agentRunKeys = {
   all: ["agent-runs"] as const,
-  list: (params?: ListRunsParams) => ["agent-runs", "list", params] as const,
-  detail: (id: string) => ["agent-runs", "detail", id] as const,
-  steps: (id: string) => ["agent-runs", "steps", id] as const,
-  loops: (id: string) => ["agent-runs", "loops", id] as const,
-  health: (from: string | null) => ["agent-runs", "health", from] as const,
-  timeseries: (from: string | null, bucket: BucketSize) =>
-    ["agent-runs", "timeseries", from, bucket] as const,
+  list: (projectId: string, params?: ListRunsParams) =>
+    ["agent-runs", projectId, "list", params] as const,
+  detail: (projectId: string, id: string) =>
+    ["agent-runs", projectId, "detail", id] as const,
+  steps: (projectId: string, id: string) =>
+    ["agent-runs", projectId, "steps", id] as const,
+  loops: (projectId: string, id: string) =>
+    ["agent-runs", projectId, "loops", id] as const,
+  health: (projectId: string, from: string | null) =>
+    ["agent-runs", projectId, "health", from] as const,
+  timeseries: (projectId: string, from: string | null, bucket: BucketSize) =>
+    ["agent-runs", projectId, "timeseries", from, bucket] as const,
 }
 
-export function useAgentRuns(params?: ListRunsParams) {
+export function useAgentRuns(
+  projectId: string | null,
+  params?: ListRunsParams
+) {
   return useQuery({
-    queryKey: agentRunKeys.list(params),
-    queryFn: () => apiClient.get<AgentRun[]>("/v1/agent/runs", { ...params }),
-    enabled: params?.from != null,
+    queryKey: agentRunKeys.list(projectId ?? "", params),
+    queryFn: () =>
+      apiClient.get<AgentRun[]>(`/v1/projects/${projectId}/agent/runs`, {
+        ...params,
+      }),
+    enabled: !!projectId && params?.from != null,
     staleTime: STALE_TIME,
   })
 }
 
-export function useAgentRun(id: string) {
+export function useAgentRun(projectId: string | null, id: string) {
   return useQuery({
-    queryKey: agentRunKeys.detail(id),
-    queryFn: () => apiClient.get<AgentRun>(`/v1/agent/runs/${id}`),
-    enabled: !!id,
+    queryKey: agentRunKeys.detail(projectId ?? "", id),
+    queryFn: () =>
+      apiClient.get<AgentRun>(`/v1/projects/${projectId}/agent/runs/${id}`),
+    enabled: !!projectId && !!id,
     staleTime: STALE_TIME,
   })
 }
 
-export function useAgentSteps(id: string) {
+export function useAgentSteps(projectId: string | null, id: string) {
   return useQuery({
-    queryKey: agentRunKeys.steps(id),
-    queryFn: () => apiClient.get<AgentStep[]>(`/v1/agent/runs/${id}/steps`),
-    enabled: !!id,
+    queryKey: agentRunKeys.steps(projectId ?? "", id),
+    queryFn: () =>
+      apiClient.get<AgentStep[]>(
+        `/v1/projects/${projectId}/agent/runs/${id}/steps`
+      ),
+    enabled: !!projectId && !!id,
     staleTime: STALE_TIME,
   })
 }
 
-export function useAgentLoops(id: string) {
+export function useAgentLoops(projectId: string | null, id: string) {
   return useQuery({
-    queryKey: agentRunKeys.loops(id),
-    queryFn: () => apiClient.get<LoopHit[]>(`/v1/agent/runs/${id}/loops`),
-    enabled: !!id,
+    queryKey: agentRunKeys.loops(projectId ?? "", id),
+    queryFn: () =>
+      apiClient.get<LoopHit[]>(
+        `/v1/projects/${projectId}/agent/runs/${id}/loops`
+      ),
+    enabled: !!projectId && !!id,
     staleTime: STALE_TIME,
   })
 }
 
 export function useRunsTimeseries(
+  projectId: string | null,
   from: string | null,
-  bucket: BucketSize = "1h",
+  bucket: BucketSize = "1h"
 ) {
   return useQuery({
-    queryKey: agentRunKeys.timeseries(from, bucket),
+    queryKey: agentRunKeys.timeseries(projectId ?? "", from, bucket),
     queryFn: () =>
-      apiClient.get<RunBucket[]>("/v1/agent/runs/timeseries", {
-        from: from!,
-        bucket,
-      }),
-    enabled: from != null,
+      apiClient.get<RunBucket[]>(
+        `/v1/projects/${projectId}/agent/runs/timeseries`,
+        { from: from!, bucket }
+      ),
+    enabled: !!projectId && from != null,
     staleTime: STALE_TIME,
   })
 }
 
-export function useRunHealth(from: string | null) {
+export function useRunHealth(projectId: string | null, from: string | null) {
   return useQuery({
-    queryKey: agentRunKeys.health(from),
+    queryKey: agentRunKeys.health(projectId ?? "", from),
     queryFn: () =>
-      apiClient.get<RunHealthRow[]>("/v1/agent/health", { from: from! }),
-    enabled: from != null,
+      apiClient.get<RunHealthRow[]>(`/v1/projects/${projectId}/agent/health`, {
+        from: from!,
+      }),
+    enabled: !!projectId && from != null,
     staleTime: STALE_TIME,
   })
 }

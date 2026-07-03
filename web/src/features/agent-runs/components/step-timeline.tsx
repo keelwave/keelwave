@@ -1,7 +1,7 @@
 import { Repeat } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { decodeToolPayload } from "@/lib/format"
+import { decodeToolPayload, formatCost, formatTokens } from "@/lib/format"
 import type { AgentStep, LoopHit, StepType } from "@/features/agent-runs/types"
 
 const KIND: Record<StepType, { label: string; dot: string }> = {
@@ -11,22 +11,33 @@ const KIND: Record<StepType, { label: string; dot: string }> = {
   replan: { label: "replan", dot: "bg-amber-500" },
 }
 
-function StepNode({ step }: { step: AgentStep }) {
+// Offset from the run's first step, e.g. "+1.2s" — turns absolute timestamps
+// into a readable "when in the run" without the reader doing date math.
+function relTime(ms: number): string {
+  if (ms <= 0) return "0ms"
+  return ms < 1000 ? `+${ms}ms` : `+${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)}s`
+}
+
+function StepNode({ step, startMs }: { step: AgentStep; startMs: number }) {
   const kind = KIND[step.step_type]
   const input = decodeToolPayload(step.tool_input)
   const output = decodeToolPayload(step.tool_output)
+  const offset = new Date(step.timestamp).getTime() - startMs
 
   return (
     <div className="relative flex gap-3">
       <span
         className={cn(
           "mt-1.5 size-2 shrink-0 rounded-full ring-4 ring-background",
-          kind.dot,
+          step.tool_success === false ? "bg-red-500" : kind.dot
         )}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1 rounded-lg border bg-card p-3">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="shrink-0 font-mono text-[11px] text-muted-foreground/60">
+            #{step.step_index}
+          </span>
+          <span className="font-mono text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
             {kind.label}
           </span>
           {step.tool_name ? (
@@ -34,14 +45,26 @@ function StepNode({ step }: { step: AgentStep }) {
               {step.tool_name}
             </span>
           ) : null}
-          {step.tool_latency_ms != null ? (
-            <span className="ml-auto shrink-0 font-mono text-xs text-muted-foreground">
-              {step.tool_latency_ms}ms
+          {step.tool_success === false ? (
+            <span className="shrink-0 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-600 dark:text-red-400">
+              failed
             </span>
           ) : null}
+          <span className="ml-auto flex shrink-0 items-center gap-2 font-mono text-xs text-muted-foreground">
+            {step.tool_latency_ms != null ? (
+              <span>{step.tool_latency_ms}ms</span>
+            ) : null}
+            {step.tokens != null ? (
+              <span>{formatTokens(step.tokens)} tok</span>
+            ) : null}
+            {step.cost_usd != null && step.cost_usd > 0 ? (
+              <span>{formatCost(step.cost_usd)}</span>
+            ) : null}
+            <span className="text-muted-foreground/50">{relTime(offset)}</span>
+          </span>
         </div>
         {step.content ? (
-          <p className="whitespace-pre-wrap break-words text-sm text-foreground/90">
+          <p className="text-sm break-words whitespace-pre-wrap text-foreground/90">
             {step.content}
           </p>
         ) : null}
@@ -60,7 +83,15 @@ function StepNode({ step }: { step: AgentStep }) {
   )
 }
 
-function LoopBand({ steps, hits }: { steps: AgentStep[]; hits: number }) {
+function LoopBand({
+  steps,
+  hits,
+  startMs,
+}: {
+  steps: AgentStep[]
+  hits: number
+  startMs: number
+}) {
   return (
     <div className="relative rounded-xl border border-dashed border-amber-500/60 bg-amber-500/5 p-3 pt-5">
       <span className="absolute -top-2.5 left-4 flex items-center gap-1.5 rounded-full border border-amber-500/50 bg-background px-2 py-0.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
@@ -69,7 +100,7 @@ function LoopBand({ steps, hits }: { steps: AgentStep[]; hits: number }) {
       </span>
       <div className="flex flex-col gap-3">
         {steps.map((s) => (
-          <StepNode key={s.id} step={s} />
+          <StepNode key={s.id} step={s} startMs={startMs} />
         ))}
       </div>
     </div>
@@ -87,10 +118,9 @@ function segment(steps: AgentStep[], loops: LoopHit[]): Segment[] {
 
   for (const step of steps) {
     const fp = step.input_fingerprint
-    const looping = fp != null && hitsByFp.has(fp)
-    const prev = segments[segments.length - 1]
+    const prev = segments.at(-1)
 
-    if (looping && fp != null) {
+    if (fp !== undefined && hitsByFp.has(fp)) {
       if (prev && prev.loop && prev.fingerprint === fp) {
         prev.steps.push(step)
       } else {
@@ -120,15 +150,23 @@ export function StepTimeline({
   loops: LoopHit[]
 }) {
   const segments = segment(steps, loops)
+  const startMs = steps.length ? new Date(steps[0].timestamp).getTime() : 0
 
   return (
     <div className="flex flex-col gap-3 border-l-2 border-muted pl-4">
       {segments.map((seg, i) =>
         seg.loop ? (
-          <LoopBand key={i} steps={seg.steps} hits={seg.hits} />
+          <LoopBand
+            key={i}
+            steps={seg.steps}
+            hits={seg.hits}
+            startMs={startMs}
+          />
         ) : (
-          seg.steps.map((s) => <StepNode key={s.id} step={s} />)
-        ),
+          seg.steps.map((s) => (
+            <StepNode key={s.id} step={s} startMs={startMs} />
+          ))
+        )
       )}
     </div>
   )

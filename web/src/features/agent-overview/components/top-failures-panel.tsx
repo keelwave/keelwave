@@ -1,8 +1,11 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  Card, CardContent, CardHeader, CardTitle,
-} from "@/components/ui/card"
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table"
 import { formatTokens } from "@/lib/format"
 import type { TerminationCount } from "@/features/agent-overview/types"
@@ -12,7 +15,9 @@ export function TopFailuresPanel({ rows }: { rows: TerminationCount[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm font-medium">Termination reasons</CardTitle>
+        <CardTitle className="text-sm font-medium">
+          Termination reasons
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <Table>
@@ -25,8 +30,12 @@ export function TopFailuresPanel({ rows }: { rows: TerminationCount[] }) {
           <TableBody>
             {sorted.map((r) => (
               <TableRow key={r.termination_reason}>
-                <TableCell className="font-mono text-sm">{r.termination_reason}</TableCell>
-                <TableCell className="text-right font-mono text-sm">{formatTokens(r.count)}</TableCell>
+                <TableCell className="font-mono text-sm">
+                  {r.termination_reason}
+                </TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {formatTokens(r.count)}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

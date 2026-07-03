@@ -26,7 +26,9 @@ export function RunHealthTable({ rows }: { rows: RunHealthRow[] }) {
         <TableBody>
           {rows.map((r) => (
             <TableRow key={r.agent_name}>
-              <TableCell className="font-mono text-sm">{r.agent_name}</TableCell>
+              <TableCell className="font-mono text-sm">
+                {r.agent_name}
+              </TableCell>
               <TableCell className="text-right font-mono text-sm">
                 {formatTokens(r.total_runs)}
               </TableCell>

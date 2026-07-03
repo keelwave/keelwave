@@ -20,7 +20,11 @@ export function MetricStrip({ items }: { items: Metric[] }) {
               {m.value}
             </span>
             {m.current != null && m.previous != null && m.goodWhen ? (
-              <DeltaBadge current={m.current} previous={m.previous} goodWhen={m.goodWhen} />
+              <DeltaBadge
+                current={m.current}
+                previous={m.previous}
+                goodWhen={m.goodWhen}
+              />
             ) : null}
           </CardContent>
         </Card>

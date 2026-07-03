@@ -1,13 +1,18 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  Card, CardContent, CardHeader, CardTitle,
-} from "@/components/ui/card"
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table"
 import type { ToolStat } from "@/features/agent-tools/types"
 
 export function SlowestToolsPanel({ tools }: { tools: ToolStat[] }) {
-  const sorted = [...tools].sort((a, b) => b.p95_latency_ms - a.p95_latency_ms).slice(0, 6)
+  const sorted = [...tools]
+    .sort((a, b) => b.p95_latency_ms - a.p95_latency_ms)
+    .slice(0, 6)
   return (
     <Card>
       <CardHeader>
@@ -26,10 +31,18 @@ export function SlowestToolsPanel({ tools }: { tools: ToolStat[] }) {
           <TableBody>
             {sorted.map((t) => (
               <TableRow key={t.tool_name}>
-                <TableCell className="font-mono text-sm">{t.tool_name}</TableCell>
-                <TableCell className="text-right font-mono text-sm">{t.p50_latency_ms}ms</TableCell>
-                <TableCell className="text-right font-mono text-sm">{t.p95_latency_ms}ms</TableCell>
-                <TableCell className="text-right font-mono text-sm">{t.p99_latency_ms}ms</TableCell>
+                <TableCell className="font-mono text-sm">
+                  {t.tool_name}
+                </TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {t.p50_latency_ms}ms
+                </TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {t.p95_latency_ms}ms
+                </TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {t.p99_latency_ms}ms
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

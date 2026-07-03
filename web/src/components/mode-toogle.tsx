@@ -16,7 +16,7 @@ export function ModeToggle({ className }: { className?: string }) {
     <div
       className={cn(
         "inline-flex items-center gap-0.5 rounded-full border border-border bg-muted/40 p-0.5",
-        className,
+        className
       )}
     >
       {OPTIONS.map(({ value, icon: Icon, label }) => {
@@ -33,7 +33,7 @@ export function ModeToggle({ className }: { className?: string }) {
               "flex size-7 items-center justify-center rounded-full transition-colors",
               active
                 ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
             <Icon className="size-3.5" />

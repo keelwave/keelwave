@@ -34,7 +34,11 @@ function bucketFor(w: TimeWindow): BucketSize {
   return w === "24h" ? "1h" : w === "7d" ? "6h" : "1d"
 }
 
-export function TimeWindowProvider({ children }: { children: React.ReactNode }) {
+export function TimeWindowProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const navigate = useNavigate()
   const window = useSearch({
     strict: false,
@@ -85,7 +89,7 @@ export function TimeWindowProvider({ children }: { children: React.ReactNode }) 
       from: ready ? windowFrom(window) : null,
       bucket: bucketFor(window),
     }),
-    [window, ready],
+    [window, ready]
   )
 
   return <TimeWindowContext value={value}>{children}</TimeWindowContext>

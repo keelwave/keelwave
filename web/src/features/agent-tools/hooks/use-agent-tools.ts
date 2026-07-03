@@ -7,15 +7,18 @@ const STALE_TIME = 1000 * 30
 
 export const agentToolKeys = {
   all: ["agent-tools"] as const,
-  stats: (from: string | null) => ["agent-tools", "stats", from] as const,
+  stats: (projectId: string, from: string | null) =>
+    ["agent-tools", projectId, "stats", from] as const,
 }
 
-export function useToolStats(from: string | null) {
+export function useToolStats(projectId: string | null, from: string | null) {
   return useQuery({
-    queryKey: agentToolKeys.stats(from),
+    queryKey: agentToolKeys.stats(projectId ?? "", from),
     queryFn: () =>
-      apiClient.get<ToolStat[]>("/v1/agent/tools/stats", { from: from! }),
-    enabled: from != null,
+      apiClient.get<ToolStat[]>(`/v1/projects/${projectId}/agent/tools/stats`, {
+        from: from!,
+      }),
+    enabled: !!projectId && from != null,
     staleTime: STALE_TIME,
   })
 }
