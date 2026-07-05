@@ -25,11 +25,14 @@ FROM agent_runs
 GROUP BY project_id, agent_name, bucket
 WITH NO DATA;
 
--- Refresh policy: materialize buckets from 1h ago up to 5m ago, every minute.
--- The 5m end_offset leaves the recent tail to real-time aggregation. Requires
+-- Refresh policy: materialize buckets from 1 day ago up to 5m ago, every minute.
+-- The 5m end_offset leaves the recent tail to real-time aggregation. The 1-day
+-- start_offset covers any realistic run duration: a run finishing long after it
+-- started invalidates its start bucket, which must still fall inside the refresh
+-- window or the finish (cost, completion) is never materialized. Requires
 -- TimescaleDB background workers (running in the dev/prod container).
 SELECT add_continuous_aggregate_policy('agent_runs_5m',
-    start_offset => INTERVAL '1 hour',
+    start_offset => INTERVAL '1 day',
     end_offset   => INTERVAL '5 minutes',
     schedule_interval => INTERVAL '1 minute',
     if_not_exists => true);

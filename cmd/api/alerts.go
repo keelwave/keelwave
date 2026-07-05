@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -22,7 +23,7 @@ type alertRulePayload struct {
 	KeepFiringForSeconds int             `json:"keep_firing_for_seconds" validate:"gte=0"`
 	CooldownSeconds      int             `json:"cooldown_seconds" validate:"gte=0"`
 	MinRequests          int             `json:"min_requests" validate:"gte=0"`
-	Channel              string          `json:"channel" validate:"required,oneof=email slack webhook pagerduty"`
+	Channel              string          `json:"channel" validate:"required,oneof=email"`
 	ChannelConfig        json.RawMessage `json:"channel_config" swaggertype:"object"`
 	Enabled              bool            `json:"enabled"`
 }
@@ -32,6 +33,13 @@ func (p alertRulePayload) toRule(projectID uuid.UUID) *store.AlertRule {
 	if cmp == "" {
 		cmp = ">"
 	}
+	// Mirror the schema's DEFAULT 900 (15 min, spec §4.2): an omitted
+	// cooldown_seconds zero-values to 0, and Create always binds it, so a 0 here
+	// would make an event rule fire on every finishing run.
+	cooldown := p.CooldownSeconds
+	if cooldown == 0 {
+		cooldown = 900
+	}
 	cfg := p.ChannelConfig
 	if len(cfg) == 0 {
 		cfg = json.RawMessage(`{}`)
@@ -40,9 +48,28 @@ func (p alertRulePayload) toRule(projectID uuid.UUID) *store.AlertRule {
 		ProjectID: projectID, AgentName: p.AgentName, Name: p.Name, Class: p.Class,
 		Signal: p.Signal, Comparator: cmp, Threshold: p.Threshold, WindowSeconds: p.WindowSeconds,
 		Severity: p.Severity, ForSeconds: p.ForSeconds, KeepFiringForSeconds: p.KeepFiringForSeconds,
-		CooldownSeconds: p.CooldownSeconds, MinRequests: p.MinRequests, Channel: p.Channel,
+		CooldownSeconds: cooldown, MinRequests: p.MinRequests, Channel: p.Channel,
 		ChannelConfig: cfg, Enabled: p.Enabled,
 	}
+}
+
+// validAlertClassSignal enforces the spec §4.2 class×signal matrix: loop is
+// event-only, the aggregate-window signals are aggregate-only, and run_failure
+// is valid for both.
+func validAlertClassSignal(class, signal string) bool {
+	switch class {
+	case "event":
+		switch signal {
+		case "loop", "run_failure":
+			return true
+		}
+	case "aggregate":
+		switch signal {
+		case "run_failure", "termination_shift", "cost_burn", "tool_failure", "duration_p95", "eval_regression":
+			return true
+		}
+	}
+	return false
 }
 
 // authorizeProject resolves the URL-scoped project and confirms it belongs to
@@ -104,6 +131,10 @@ func (app *application) createAlertRuleHandler(w http.ResponseWriter, r *http.Re
 	}
 	if err := Validate.Struct(payload); err != nil {
 		app.badRequestResponse(w, r, err)
+		return
+	}
+	if !validAlertClassSignal(payload.Class, payload.Signal) {
+		app.badRequestResponse(w, r, fmt.Errorf("signal %q is not valid for class %q", payload.Signal, payload.Class))
 		return
 	}
 
@@ -179,6 +210,10 @@ func (app *application) updateAlertRuleHandler(w http.ResponseWriter, r *http.Re
 	}
 	if err := Validate.Struct(payload); err != nil {
 		app.badRequestResponse(w, r, err)
+		return
+	}
+	if !validAlertClassSignal(payload.Class, payload.Signal) {
+		app.badRequestResponse(w, r, fmt.Errorf("signal %q is not valid for class %q", payload.Signal, payload.Class))
 		return
 	}
 

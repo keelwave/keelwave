@@ -165,6 +165,76 @@ func TestAlertRuleHandler_ChannelConfigRoundTrip(t *testing.T) {
 	assert.True(t, found, "created rule appears in list")
 }
 
+func TestAlertRuleHandler_rejectsIncompatibleClassSignal(t *testing.T) {
+	ts := newTestServer(t)
+	base := alertRulesURL(ts)
+
+	// loop is an event-only signal; class=aggregate must be rejected (Fix 3).
+	resp, raw := doJSON(t, http.MethodPost, base, "", map[string]any{
+		"name":     "loop on aggregate",
+		"class":    "aggregate",
+		"signal":   "loop",
+		"severity": "page",
+		"channel":  "email",
+	}, nil, ts.cookie)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "aggregate+loop rejected, body=%s", raw)
+}
+
+func TestAlertRuleHandler_rejectsUnwiredChannel(t *testing.T) {
+	ts := newTestServer(t)
+	base := alertRulesURL(ts)
+
+	// Only email has a sender wired; slack/webhook/pagerduty are rejected (Fix 5).
+	resp, raw := doJSON(t, http.MethodPost, base, "", map[string]any{
+		"name":     "slack page",
+		"class":    "event",
+		"signal":   "loop",
+		"severity": "page",
+		"channel":  "slack",
+	}, nil, ts.cookie)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "channel=slack rejected, body=%s", raw)
+}
+
+func TestAlertRuleHandler_cooldownDefaults900(t *testing.T) {
+	ts := newTestServer(t)
+	base := alertRulesURL(ts)
+
+	// An event rule created without cooldown_seconds must default to 900 (Fix 2),
+	// otherwise NextEvent with cooldown 0 fires on every finishing run.
+	var created struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	resp, raw := doJSON(t, http.MethodPost, base, "", map[string]any{
+		"name":     "loop no cooldown",
+		"class":    "event",
+		"signal":   "loop",
+		"severity": "page",
+		"channel":  "email",
+		"enabled":  true,
+	}, &created, ts.cookie)
+	require.Equal(t, http.StatusCreated, resp.StatusCode, "body=%s", raw)
+	require.NotEmpty(t, created.Data.ID)
+
+	var listed struct {
+		Data []struct {
+			ID              string `json:"id"`
+			CooldownSeconds int    `json:"cooldown_seconds"`
+		} `json:"data"`
+	}
+	resp, raw = doJSON(t, http.MethodGet, base, "", nil, &listed, ts.cookie)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "body=%s", raw)
+	found := false
+	for _, r := range listed.Data {
+		if r.ID == created.Data.ID {
+			found = true
+			assert.Equal(t, 900, r.CooldownSeconds, "omitted cooldown_seconds defaults to 900")
+		}
+	}
+	assert.True(t, found, "created rule appears in list")
+}
+
 func TestAlertRuleHandler_rejectsInvalidEnum(t *testing.T) {
 	ts := newTestServer(t)
 	base := alertRulesURL(ts)

@@ -38,7 +38,8 @@ func (ev *Evaluator) EvaluateRunFinish(ctx context.Context, projectID uuid.UUID,
 		fp := Fingerprint(rule.ID, agentName)
 		live, err := ev.s.AlertEvents.GetLive(ctx, rule.ID, fp)
 		if err != nil && !errors.Is(err, store.ErrNotFound) {
-			return err
+			ev.log.Warnw("alert event live lookup failed", "rule", rule.ID, "err", err)
+			continue
 		}
 		var evt *Event
 		if live != nil {
@@ -49,8 +50,12 @@ func (ev *Evaluator) EvaluateRunFinish(ctx context.Context, projectID uuid.UUID,
 		if d.Notify != "fire" {
 			continue // within cooldown: suppressed
 		}
+		// A per-rule persist error (including the EXPECTED unique-index violation
+		// on alert_events_live_idx when two finishes race the first fire) must not
+		// suppress the remaining rules — log and continue, mirroring scheduler.tick.
 		if err := ev.persistEvent(ctx, rule, live, fp, agentName, now); err != nil {
-			return err
+			ev.log.Warnw("alert event persist failed", "rule", rule.ID, "err", err)
+			continue
 		}
 	}
 	return nil
