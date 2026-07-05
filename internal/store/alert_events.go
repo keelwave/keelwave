@@ -20,6 +20,7 @@ type AlertEvent struct {
 	FirstBreachedAt *time.Time `json:"first_breached_at,omitempty"`
 	FiredAt         *time.Time `json:"fired_at,omitempty"`
 	ResolvedAt      *time.Time `json:"resolved_at,omitempty"`
+	RecoveringSince *time.Time `json:"recovering_since,omitempty"`
 	LastFiredAt     *time.Time `json:"last_fired_at,omitempty"`
 	LastValue       *float64   `json:"last_value,omitempty"`
 	LastEvaluatedAt time.Time  `json:"last_evaluated_at"`
@@ -30,13 +31,13 @@ type AlertEventStore struct {
 }
 
 const alertEventCols = `id, rule_id, project_id, fingerprint, scope_label, state,
-	first_breached_at, fired_at, resolved_at, last_fired_at, last_value, last_evaluated_at`
+	first_breached_at, fired_at, resolved_at, recovering_since, last_fired_at, last_value, last_evaluated_at`
 
 func scanAlertEvent(row pgx.Row) (*AlertEvent, error) {
 	e := &AlertEvent{}
 	err := row.Scan(&e.ID, &e.RuleID, &e.ProjectID, &e.Fingerprint, &e.ScopeLabel,
-		&e.State, &e.FirstBreachedAt, &e.FiredAt, &e.ResolvedAt, &e.LastFiredAt,
-		&e.LastValue, &e.LastEvaluatedAt)
+		&e.State, &e.FirstBreachedAt, &e.FiredAt, &e.ResolvedAt, &e.RecoveringSince,
+		&e.LastFiredAt, &e.LastValue, &e.LastEvaluatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -62,20 +63,21 @@ func (s *AlertEventStore) Upsert(ctx context.Context, tx pgx.Tx, e *AlertEvent) 
 	if e.ID != uuid.Nil {
 		const q = `
 			UPDATE alert_events SET state=$2, first_breached_at=$3, fired_at=$4,
-				resolved_at=$5, last_fired_at=$6, last_value=$7, last_evaluated_at=$8
+				resolved_at=$5, recovering_since=$6, last_fired_at=$7, last_value=$8,
+				last_evaluated_at=$9
 			WHERE id=$1`
 		_, err := tx.Exec(ctx, q, e.ID, e.State, e.FirstBreachedAt, e.FiredAt,
-			e.ResolvedAt, e.LastFiredAt, e.LastValue, e.LastEvaluatedAt)
+			e.ResolvedAt, e.RecoveringSince, e.LastFiredAt, e.LastValue, e.LastEvaluatedAt)
 		return err
 	}
 	const q = `
 		INSERT INTO alert_events (rule_id, project_id, fingerprint, scope_label, state,
-			first_breached_at, fired_at, resolved_at, last_fired_at, last_value, last_evaluated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			first_breached_at, fired_at, resolved_at, recovering_since, last_fired_at, last_value, last_evaluated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		RETURNING id`
 	return tx.QueryRow(ctx, q, e.RuleID, e.ProjectID, e.Fingerprint, e.ScopeLabel, e.State,
-		e.FirstBreachedAt, e.FiredAt, e.ResolvedAt, e.LastFiredAt, e.LastValue,
-		e.LastEvaluatedAt).Scan(&e.ID)
+		e.FirstBreachedAt, e.FiredAt, e.ResolvedAt, e.RecoveringSince, e.LastFiredAt,
+		e.LastValue, e.LastEvaluatedAt).Scan(&e.ID)
 }
 
 func (s *AlertEventStore) ListByProject(ctx context.Context, projectID uuid.UUID, limit int) ([]*AlertEvent, error) {

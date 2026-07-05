@@ -42,10 +42,21 @@ func TestAlertEventStore_UpsertGetLive(t *testing.T) {
 	assert.Equal(t, "firing", again.State)
 	assert.Equal(t, live.ID, again.ID)
 
-	// resolving removes it from "live"
-	again.State = "resolved"
-	again.ResolvedAt = &now
+	// condition clears -> recovering, stamping recovering_since (round-trips)
+	recSince := now.Add(-30 * time.Second)
+	again.State = "recovering"
+	again.RecoveringSince = &recSince
 	require.NoError(t, withTx(testPool, ctx, func(tx pgx.Tx) error { return s.AlertEvents.Upsert(ctx, tx, again) }))
+	rec, err := s.AlertEvents.GetLive(ctx, rule.ID, fp)
+	require.NoError(t, err)
+	assert.Equal(t, "recovering", rec.State)
+	require.NotNil(t, rec.RecoveringSince)
+	assert.WithinDuration(t, recSince, *rec.RecoveringSince, time.Second)
+
+	// resolving removes it from "live"
+	rec.State = "resolved"
+	rec.ResolvedAt = &now
+	require.NoError(t, withTx(testPool, ctx, func(tx pgx.Tx) error { return s.AlertEvents.Upsert(ctx, tx, rec) }))
 	_, err = s.AlertEvents.GetLive(ctx, rule.ID, fp)
 	assert.ErrorIs(t, err, ErrNotFound)
 }
