@@ -127,6 +127,11 @@ type Storage struct {
 		Update(ctx context.Context, r *AlertRule) error
 		Delete(ctx context.Context, id, projectID uuid.UUID) error
 	}
+	AlertEvents interface {
+		GetLive(ctx context.Context, ruleID uuid.UUID, fingerprint []byte) (*AlertEvent, error)
+		Upsert(ctx context.Context, tx pgx.Tx, e *AlertEvent) error
+		ListByProject(ctx context.Context, projectID uuid.UUID, limit int) ([]*AlertEvent, error)
+	}
 }
 
 func withTx(pool *pgxpool.Pool, ctx context.Context, fn func(pgx.Tx) error) error {
@@ -164,5 +169,6 @@ func NewStorage(pool *pgxpool.Pool) Storage {
 		AgentTools:          &AgentToolStore{pool: pool},
 		AgentEvaluations:    &AgentEvaluationStore{pool: pool},
 		AlertRules:          &AlertRuleStore{pool: pool},
+		AlertEvents:         &AlertEventStore{pool: pool},
 	}
 }
