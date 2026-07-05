@@ -2,7 +2,9 @@ package alerting
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -10,6 +12,24 @@ import (
 
 	"github.com/keelwave/keelwave/internal/store"
 )
+
+func TestBuildPayload_MergesRecipientAndKeys(t *testing.T) {
+	win := 300
+	rule := &store.AlertRule{
+		Name: "cost", Signal: "cost_burn", Severity: "page",
+		Comparator: ">", Threshold: 5, WindowSeconds: &win,
+		ChannelConfig: json.RawMessage(`{"to":"ops@acme.com"}`),
+	}
+
+	b := buildPayload(rule, "agent-x", 9.0, "fire", time.Now())
+
+	var m map[string]any
+	require.NoError(t, json.Unmarshal(b, &m))
+	assert.Equal(t, "ops@acme.com", m["to"], "recipient from channel_config must flow through")
+	assert.Equal(t, rule.Name, m["rule_name"])
+	assert.Equal(t, "fire", m["transition"])
+	assert.Contains(t, m, "window", "window must be present when window_seconds is set")
+}
 
 func TestEvaluator_costBurnFires(t *testing.T) {
 	ctx := context.Background()

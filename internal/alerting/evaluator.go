@@ -233,41 +233,41 @@ func compare(value float64, comparator string, threshold float64) bool {
 	}
 }
 
-// alertPayload is the channel-agnostic alert body stored on the notification_jobs
-// row (spec §5); channel senders render it into their wire shape.
-type alertPayload struct {
-	Rule        string    `json:"rule"`
-	Signal      string    `json:"signal"`
-	Severity    string    `json:"severity"`
-	ProjectID   string    `json:"project_id"`
-	Scope       string    `json:"scope"`
-	Kind        string    `json:"kind"` // "fire" | "resolve"
-	Value       float64   `json:"value"`
-	Comparator  string    `json:"comparator"`
-	Threshold   float64   `json:"threshold"`
-	Window      int       `json:"window_seconds,omitempty"`
-	FiredAt     time.Time `json:"fired_at"`
-	Fingerprint string    `json:"fingerprint"`
-}
-
+// buildPayload assembles the channel-agnostic alert body stored on the
+// notification_jobs row. Keys match the mailer template; the rule's
+// channel_config is merged in so the channel sender finds its target (email's
+// "to", webhook's "url") in the payload.
 func buildPayload(rule *store.AlertRule, scope string, value float64, kind string, now time.Time) []byte {
-	p := alertPayload{
-		Rule:        rule.Name,
-		Signal:      rule.Signal,
-		Severity:    rule.Severity,
-		ProjectID:   rule.ProjectID.String(),
-		Scope:       scope,
-		Kind:        kind,
-		Value:       value,
-		Comparator:  rule.Comparator,
-		Threshold:   rule.Threshold,
-		FiredAt:     now,
-		Fingerprint: hex.EncodeToString(Fingerprint(rule.ID, scope)),
+	m := map[string]any{
+		"rule_name":   rule.Name,
+		"signal":      rule.Signal,
+		"severity":    rule.Severity,
+		"project_id":  rule.ProjectID.String(),
+		"scope":       scope,
+		"transition":  kind, // "fire" | "resolve"
+		"value":       value,
+		"comparator":  rule.Comparator,
+		"threshold":   rule.Threshold,
+		"fired_at":    now.Format(time.RFC3339),
+		"fingerprint": hex.EncodeToString(Fingerprint(rule.ID, scope)),
 	}
 	if rule.WindowSeconds != nil {
-		p.Window = *rule.WindowSeconds
+		m["window"] = *rule.WindowSeconds
 	}
-	b, _ := json.Marshal(p) // fixed shape of primitives: marshal cannot fail
+	// Merge channel_config (carries the recipient: "to" for email, "url" for
+	// webhook) so the channel sender finds its target in the payload. Alert
+	// fields win on key clash.
+	if len(rule.ChannelConfig) > 0 {
+		var cc map[string]any
+		if err := json.Unmarshal(rule.ChannelConfig, &cc); err == nil {
+			for k, v := range cc {
+				if _, exists := m[k]; !exists {
+					m[k] = v
+				}
+			}
+		}
+	}
+	b, _ := json.Marshal(m)
 	return b
 }
 
