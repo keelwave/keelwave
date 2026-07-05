@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -11,24 +12,24 @@ import (
 )
 
 type AlertRule struct {
-	ID                   uuid.UUID `json:"id"`
-	ProjectID            uuid.UUID `json:"project_id"`
-	AgentName            *string   `json:"agent_name,omitempty"`
-	Name                 string    `json:"name"`
-	Class                string    `json:"class"`
-	Signal               string    `json:"signal"`
-	Comparator           string    `json:"comparator"`
-	Threshold            float64   `json:"threshold"`
-	WindowSeconds        *int      `json:"window_seconds,omitempty"`
-	Severity             string    `json:"severity"`
-	ForSeconds           int       `json:"for_seconds"`
-	KeepFiringForSeconds int       `json:"keep_firing_for_seconds"`
-	CooldownSeconds      int       `json:"cooldown_seconds"`
-	MinRequests          int       `json:"min_requests"`
-	Channel              string    `json:"channel"`
-	ChannelConfig        []byte    `json:"channel_config"`
-	Enabled              bool      `json:"enabled"`
-	CreatedAt            time.Time `json:"created_at"`
+	ID                   uuid.UUID       `json:"id"`
+	ProjectID            uuid.UUID       `json:"project_id"`
+	AgentName            *string         `json:"agent_name,omitempty"`
+	Name                 string          `json:"name"`
+	Class                string          `json:"class"`
+	Signal               string          `json:"signal"`
+	Comparator           string          `json:"comparator"`
+	Threshold            float64         `json:"threshold"`
+	WindowSeconds        *int            `json:"window_seconds,omitempty"`
+	Severity             string          `json:"severity"`
+	ForSeconds           int             `json:"for_seconds"`
+	KeepFiringForSeconds int             `json:"keep_firing_for_seconds"`
+	CooldownSeconds      int             `json:"cooldown_seconds"`
+	MinRequests          int             `json:"min_requests"`
+	Channel              string          `json:"channel"`
+	ChannelConfig        json.RawMessage `json:"channel_config"`
+	Enabled              bool            `json:"enabled"`
+	CreatedAt            time.Time       `json:"created_at"`
 }
 
 type AlertRuleStore struct {

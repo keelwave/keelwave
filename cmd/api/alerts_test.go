@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -74,13 +75,13 @@ func TestAlertRuleHandler_UpdateAppliesFields(t *testing.T) {
 		} `json:"data"`
 	}
 	resp, raw := doJSON(t, http.MethodPost, base, "", map[string]any{
-		"name":     "cost burn",
-		"class":    "aggregate",
-		"signal":   "cost_burn",
-		"severity": "warn",
-		"channel":  "email",
+		"name":      "cost burn",
+		"class":     "aggregate",
+		"signal":    "cost_burn",
+		"severity":  "warn",
+		"channel":   "email",
 		"threshold": 5,
-		"enabled":  true,
+		"enabled":   true,
 	}, &created, ts.cookie)
 	require.Equal(t, http.StatusCreated, resp.StatusCode, "body=%s", raw)
 
@@ -92,18 +93,76 @@ func TestAlertRuleHandler_UpdateAppliesFields(t *testing.T) {
 		} `json:"data"`
 	}
 	resp, raw = doJSON(t, http.MethodPatch, base+"/"+created.Data.ID, "", map[string]any{
-		"name":     "cost burn v2",
-		"class":    "aggregate",
-		"signal":   "cost_burn",
-		"severity": "page",
-		"channel":  "email",
+		"name":      "cost burn v2",
+		"class":     "aggregate",
+		"signal":    "cost_burn",
+		"severity":  "page",
+		"channel":   "email",
 		"threshold": 10,
-		"enabled":  false,
+		"enabled":   false,
 	}, &updated, ts.cookie)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "body=%s", raw)
 	assert.Equal(t, "cost burn v2", updated.Data.Name)
 	assert.Equal(t, "page", updated.Data.Severity)
 	assert.False(t, updated.Data.Enabled)
+}
+
+func TestAlertRuleHandler_ChannelConfigRoundTrip(t *testing.T) {
+	ts := newTestServer(t)
+	base := alertRulesURL(ts)
+
+	var created struct {
+		Data struct {
+			ID            string          `json:"id"`
+			ChannelConfig json.RawMessage `json:"channel_config"`
+		} `json:"data"`
+	}
+	// channel_config is sent as a real JSON object, not a base64 string.
+	resp, raw := doJSON(t, http.MethodPost, base, "", map[string]any{
+		"name":     "email ops",
+		"class":    "event",
+		"signal":   "run_failure",
+		"severity": "page",
+		"channel":  "email",
+		"channel_config": map[string]any{
+			"to": "ops@acme.com",
+		},
+		"enabled": true,
+	}, &created, ts.cookie)
+	require.Equal(t, http.StatusCreated, resp.StatusCode, "body=%s", raw)
+	require.NotEmpty(t, created.Data.ID)
+
+	// The create response must echo the object back verbatim, not base64.
+	var createdCfg struct {
+		To string `json:"to"`
+	}
+	require.NoError(t, json.Unmarshal(created.Data.ChannelConfig, &createdCfg),
+		"channel_config should be a JSON object, got %s", created.Data.ChannelConfig)
+	assert.Equal(t, "ops@acme.com", createdCfg.To)
+
+	// GET (via list) must round-trip the same JSON object back.
+	var listed struct {
+		Data []struct {
+			ID            string          `json:"id"`
+			ChannelConfig json.RawMessage `json:"channel_config"`
+		} `json:"data"`
+	}
+	resp, raw = doJSON(t, http.MethodGet, base, "", nil, &listed, ts.cookie)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "body=%s", raw)
+
+	found := false
+	for _, r := range listed.Data {
+		if r.ID == created.Data.ID {
+			found = true
+			var gotCfg struct {
+				To string `json:"to"`
+			}
+			require.NoError(t, json.Unmarshal(r.ChannelConfig, &gotCfg),
+				"channel_config should be a JSON object, got %s", r.ChannelConfig)
+			assert.Equal(t, "ops@acme.com", gotCfg.To)
+		}
+	}
+	assert.True(t, found, "created rule appears in list")
 }
 
 func TestAlertRuleHandler_rejectsInvalidEnum(t *testing.T) {

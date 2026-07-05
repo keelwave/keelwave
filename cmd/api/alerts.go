@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -9,21 +10,21 @@ import (
 )
 
 type alertRulePayload struct {
-	AgentName            *string `json:"agent_name"`
-	Name                 string  `json:"name" validate:"required,max=200"`
-	Class                string  `json:"class" validate:"required,oneof=event aggregate"`
-	Signal               string  `json:"signal" validate:"required,oneof=run_failure loop termination_shift cost_burn tool_failure duration_p95 eval_regression"`
-	Comparator           string  `json:"comparator" validate:"omitempty,oneof=> >= < <="`
-	Threshold            float64 `json:"threshold" validate:"gte=0"`
-	WindowSeconds        *int    `json:"window_seconds" validate:"omitempty,gt=0"`
-	Severity             string  `json:"severity" validate:"required,oneof=page warn digest"`
-	ForSeconds           int     `json:"for_seconds" validate:"gte=0"`
-	KeepFiringForSeconds int     `json:"keep_firing_for_seconds" validate:"gte=0"`
-	CooldownSeconds      int     `json:"cooldown_seconds" validate:"gte=0"`
-	MinRequests          int     `json:"min_requests" validate:"gte=0"`
-	Channel              string  `json:"channel" validate:"required,oneof=email slack webhook pagerduty"`
-	ChannelConfig        []byte  `json:"channel_config" swaggertype:"object"`
-	Enabled              bool    `json:"enabled"`
+	AgentName            *string         `json:"agent_name"`
+	Name                 string          `json:"name" validate:"required,max=200"`
+	Class                string          `json:"class" validate:"required,oneof=event aggregate"`
+	Signal               string          `json:"signal" validate:"required,oneof=run_failure loop termination_shift cost_burn tool_failure duration_p95 eval_regression"`
+	Comparator           string          `json:"comparator" validate:"omitempty,oneof=> >= < <="`
+	Threshold            float64         `json:"threshold" validate:"gte=0"`
+	WindowSeconds        *int            `json:"window_seconds" validate:"omitempty,gt=0"`
+	Severity             string          `json:"severity" validate:"required,oneof=page warn digest"`
+	ForSeconds           int             `json:"for_seconds" validate:"gte=0"`
+	KeepFiringForSeconds int             `json:"keep_firing_for_seconds" validate:"gte=0"`
+	CooldownSeconds      int             `json:"cooldown_seconds" validate:"gte=0"`
+	MinRequests          int             `json:"min_requests" validate:"gte=0"`
+	Channel              string          `json:"channel" validate:"required,oneof=email slack webhook pagerduty"`
+	ChannelConfig        json.RawMessage `json:"channel_config" swaggertype:"object"`
+	Enabled              bool            `json:"enabled"`
 }
 
 func (p alertRulePayload) toRule(projectID uuid.UUID) *store.AlertRule {
@@ -33,7 +34,7 @@ func (p alertRulePayload) toRule(projectID uuid.UUID) *store.AlertRule {
 	}
 	cfg := p.ChannelConfig
 	if len(cfg) == 0 {
-		cfg = []byte(`{}`)
+		cfg = json.RawMessage(`{}`)
 	}
 	return &store.AlertRule{
 		ProjectID: projectID, AgentName: p.AgentName, Name: p.Name, Class: p.Class,
