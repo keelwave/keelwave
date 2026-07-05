@@ -164,7 +164,11 @@ func TestAgentRunStore_RunHealth_rollsUpPerAgentName(t *testing.T) {
 			Status:       status,
 			LoopDetected: loop,
 			TotalTokens:  tokens,
-			TotalCostUSD: &cost,
+		}))
+		// Run cost derives from linked ai_traces, not the run's stored rollup.
+		require.NoError(t, s.AITraces.Insert(ctx, &AITrace{
+			ProjectID: p.ID, Model: "test", Status: "success",
+			AgentRunID: &run.ID, CostUSD: &cost, Timestamp: run.Timestamp,
 		}))
 	}
 	mk("research-agent", "completed", false, 0.02, 1000)

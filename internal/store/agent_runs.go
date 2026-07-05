@@ -70,10 +70,19 @@ func (s *AgentRunStore) ListByProject(ctx context.Context, projectID uuid.UUID, 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
+	// Prefer cost summed from the run's linked ai_traces (auto-emitted + priced
+	// server-side per LLM call); fall back to the stored rollup for users who
+	// report cost manually without our provider adapters. See
+	// docs/notes/cost-pricing.md.
 	const q = `
 		SELECT id, timestamp, project_id, agent_name, status,
 		       termination_reason, loop_detected, loop_step_index,
-		       total_steps, total_tokens, total_cost_usd, duration_ms,
+		       total_steps, total_tokens,
+		       coalesce(
+		         (SELECT sum(t.cost_usd) FROM ai_traces t
+		          WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id),
+		         total_cost_usd) AS total_cost_usd,
+		       duration_ms,
 		       input, output, metadata, finished_at
 		FROM agent_runs
 		WHERE project_id = $1 AND timestamp >= $2 AND timestamp < $3
@@ -106,10 +115,16 @@ func (s *AgentRunStore) GetByID(ctx context.Context, projectID, runID uuid.UUID,
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
+	// total_cost_usd: linked-trace sum, falling back to the stored rollup — see ListByProject.
 	const q = `
 		SELECT id, timestamp, project_id, agent_name, status,
 		       termination_reason, loop_detected, loop_step_index,
-		       total_steps, total_tokens, total_cost_usd, duration_ms,
+		       total_steps, total_tokens,
+		       coalesce(
+		         (SELECT sum(t.cost_usd) FROM ai_traces t
+		          WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id),
+		         total_cost_usd) AS total_cost_usd,
+		       duration_ms,
 		       input, output, metadata, finished_at
 		FROM agent_runs
 		WHERE project_id = $1 AND id = $2
@@ -194,7 +209,11 @@ func (s *AgentRunStore) RunHealth(ctx context.Context, projectID uuid.UUID, from
 		       count(*) FILTER (WHERE timestamp >= $2)::int                              AS total_runs,
 		       count(*) FILTER (WHERE timestamp >= $2 AND status = 'completed')::int     AS completed_runs,
 		       count(*) FILTER (WHERE timestamp >= $2 AND loop_detected)::int            AS loop_runs,
-		       avg(total_cost_usd) FILTER (WHERE timestamp >= $2)::float8                AS avg_cost_usd,
+		       avg(coalesce(
+		             (SELECT sum(t.cost_usd) FROM ai_traces t
+		              WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id),
+		             total_cost_usd))
+		           FILTER (WHERE timestamp >= $2)::float8                                AS avg_cost_usd,
 		       coalesce(avg(total_tokens) FILTER (WHERE timestamp >= $2), 0)::float8     AS avg_tokens,
 		       count(*) FILTER (WHERE timestamp < $2)::int                               AS prev_total_runs
 		FROM agent_runs
@@ -265,7 +284,11 @@ func (s *AgentRunStore) SummaryWithPrev(ctx context.Context, projectID uuid.UUID
 			count(*) FILTER (WHERE timestamp >= $2)::int                                          AS cur_total,
 			count(*) FILTER (WHERE timestamp >= $2 AND status = 'completed')::int                 AS cur_completed,
 			count(*) FILTER (WHERE timestamp >= $2 AND loop_detected)::int                        AS cur_loops,
-			avg(total_cost_usd) FILTER (WHERE timestamp >= $2)::float8                            AS cur_avg_cost,
+			avg(coalesce(
+			      (SELECT sum(t.cost_usd) FROM ai_traces t
+			       WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id),
+			      total_cost_usd))
+			    FILTER (WHERE timestamp >= $2)::float8                                            AS cur_avg_cost,
 			coalesce(avg(total_tokens) FILTER (WHERE timestamp >= $2), 0)::float8                 AS cur_avg_tokens,
 			coalesce(sum(total_steps) FILTER (WHERE timestamp >= $2), 0)::int                     AS cur_steps,
 			coalesce(percentile_disc(0.50) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE timestamp >= $2), 0)::int AS cur_p50,
@@ -276,7 +299,11 @@ func (s *AgentRunStore) SummaryWithPrev(ctx context.Context, projectID uuid.UUID
 			count(*) FILTER (WHERE timestamp < $2)::int                                           AS prev_total,
 			count(*) FILTER (WHERE timestamp < $2 AND status = 'completed')::int                  AS prev_completed,
 			count(*) FILTER (WHERE timestamp < $2 AND loop_detected)::int                         AS prev_loops,
-			avg(total_cost_usd) FILTER (WHERE timestamp < $2)::float8                             AS prev_avg_cost,
+			avg(coalesce(
+			      (SELECT sum(t.cost_usd) FROM ai_traces t
+			       WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id),
+			      total_cost_usd))
+			    FILTER (WHERE timestamp < $2)::float8                                             AS prev_avg_cost,
 			coalesce(avg(total_tokens) FILTER (WHERE timestamp < $2), 0)::float8                  AS prev_avg_tokens,
 			coalesce(sum(total_steps) FILTER (WHERE timestamp < $2), 0)::int                      AS prev_steps,
 			coalesce(percentile_disc(0.50) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE timestamp < $2), 0)::int AS prev_p50,
