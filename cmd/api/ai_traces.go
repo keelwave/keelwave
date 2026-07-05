@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/keelwave/keelwave/internal/batch"
+	"github.com/keelwave/keelwave/internal/pricing"
 	"github.com/keelwave/keelwave/internal/store"
 )
 
@@ -61,6 +62,15 @@ func (app *application) ingestAIHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Compute cost server-side from the catalog; trust the client value only
+	// when the model has no known rate.
+	cost := payload.CostUSD
+	if payload.InputTokens != nil && payload.OutputTokens != nil {
+		if c, ok := pricing.Cost(payload.Model, *payload.InputTokens, *payload.OutputTokens); ok {
+			cost = &c
+		}
+	}
+
 	t := &store.AITrace{
 		ID:           id,
 		ProjectID:    projectID,
@@ -69,7 +79,7 @@ func (app *application) ingestAIHandler(w http.ResponseWriter, r *http.Request) 
 		InputTokens:  payload.InputTokens,
 		OutputTokens: payload.OutputTokens,
 		TotalTokens:  payload.TotalTokens,
-		CostUSD:      payload.CostUSD,
+		CostUSD:      cost,
 		LatencyMs:    payload.LatencyMs,
 		Status:       payload.Status,
 		ErrorMessage: payload.ErrorMessage,
