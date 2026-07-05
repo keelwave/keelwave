@@ -119,6 +119,14 @@ type Storage struct {
 		Insert(ctx context.Context, e *AgentEvaluation) error
 		ListByRun(ctx context.Context, runID uuid.UUID) ([]*AgentEvaluation, error)
 	}
+	AlertRules interface {
+		Create(ctx context.Context, r *AlertRule) error
+		GetByID(ctx context.Context, id, projectID uuid.UUID) (*AlertRule, error)
+		ListByProject(ctx context.Context, projectID uuid.UUID) ([]*AlertRule, error)
+		ListEnabled(ctx context.Context) ([]*AlertRule, error)
+		Update(ctx context.Context, r *AlertRule) error
+		Delete(ctx context.Context, id, projectID uuid.UUID) error
+	}
 }
 
 func withTx(pool *pgxpool.Pool, ctx context.Context, fn func(pgx.Tx) error) error {
@@ -155,5 +163,6 @@ func NewStorage(pool *pgxpool.Pool) Storage {
 		AgentSteps:          &AgentStepStore{pool: pool},
 		AgentTools:          &AgentToolStore{pool: pool},
 		AgentEvaluations:    &AgentEvaluationStore{pool: pool},
+		AlertRules:          &AlertRuleStore{pool: pool},
 	}
 }
