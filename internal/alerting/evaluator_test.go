@@ -51,8 +51,9 @@ func TestEvaluator_costBurnFires(t *testing.T) {
 	ev := NewEvaluator(pool, s, zap.NewNop().Sugar())
 	require.NoError(t, ev.EvaluateAggregate(ctx, rule))
 
-	// a live firing event + a queued email job exist
-	fp := Fingerprint(rule.ID, "x")
+	// The rule is unscoped (no agent_name), so it aggregates project-wide under
+	// the empty scope: a live firing event + a queued email job exist.
+	fp := Fingerprint(rule.ID, "")
 	live, err := s.AlertEvents.GetLive(ctx, rule.ID, fp)
 	require.NoError(t, err)
 	assert.Equal(t, "firing", live.State)

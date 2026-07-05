@@ -41,8 +41,9 @@ func TestScheduler_tickEvaluatesAggregate(t *testing.T) {
 	sc := NewScheduler(ev, s, zap.NewNop().Sugar(), time.Minute)
 	sc.tick(ctx)
 
-	// aggregate rule evaluated → live firing event + queued email job
-	live, err := s.AlertEvents.GetLive(ctx, rule.ID, Fingerprint(rule.ID, "x"))
+	// aggregate rule evaluated → live firing event + queued email job. The rule
+	// is unscoped, so it fires on the project-wide empty scope.
+	live, err := s.AlertEvents.GetLive(ctx, rule.ID, Fingerprint(rule.ID, ""))
 	require.NoError(t, err)
 	assert.Equal(t, "firing", live.State)
 
@@ -51,6 +52,6 @@ func TestScheduler_tickEvaluatesAggregate(t *testing.T) {
 	assert.GreaterOrEqual(t, len(jobs), 1)
 
 	// event-class rule skipped → no event written for it
-	_, err = s.AlertEvents.GetLive(ctx, evtRule.ID, Fingerprint(evtRule.ID, "x"))
+	_, err = s.AlertEvents.GetLive(ctx, evtRule.ID, Fingerprint(evtRule.ID, ""))
 	assert.ErrorIs(t, err, store.ErrNotFound, "event-class rule must be skipped by the aggregate tick")
 }

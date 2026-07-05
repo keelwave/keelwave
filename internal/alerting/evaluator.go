@@ -163,11 +163,22 @@ func (ev *Evaluator) persist(ctx context.Context, rule *store.AlertRule, live *s
 }
 
 // queryMetric resolves the rule's observed value + scope over its window. Returns
-// the breaching scope's value, its scope_label (agent_name), and the run count in
-// the window (for the min_requests noise guard).
+// the observed value, its scope_label, and the denominator count in the window
+// (for the min_requests noise guard).
 //
-// A2 implements cost_burn only; the remaining signals (run_failure,
-// termination_shift, tool_failure, duration_p95, eval_regression) land in Task 12.
+// Scope follows the spec §4.2 two-lifecycle split, keeping the fingerprint stable:
+// a scoped rule (AgentName != nil) filters to that agent and labels the stream
+// with the agent name; an unscoped rule (AgentName == nil) aggregates the whole
+// project (all agents together) under the empty scope. A shared agent-name
+// predicate handles both cases in one query: an empty agentFilter matches every
+// agent, a set one restricts to it. Each query is a pure aggregate (no GROUP BY),
+// so it always returns exactly one row.
+//
+// Signal sources: cost/completion/termination read the agent_runs_5m continuous
+// aggregate (real-time, so the un-materialized tail counts); duration_p95 is a
+// query-time ordered-set aggregate on raw agent_runs (caggs can't materialize
+// percentiles); tool_failure reads agent_steps and eval_regression reads
+// agent_evaluations, each joined to agent_runs for agent scoping.
 func (ev *Evaluator) queryMetric(ctx context.Context, rule *store.AlertRule) (float64, string, int, error) {
 	ctx, cancel := context.WithTimeout(ctx, store.QueryTimeoutDuration)
 	defer cancel()
@@ -176,45 +187,93 @@ func (ev *Evaluator) queryMetric(ctx context.Context, rule *store.AlertRule) (fl
 	if rule.WindowSeconds != nil {
 		window = *rule.WindowSeconds
 	}
-	agentFilter := ""
+	scope := ""
 	if rule.AgentName != nil {
-		agentFilter = *rule.AgentName
+		scope = *rule.AgentName
 	}
+	agentFilter := scope // "" => project-wide (matches every agent)
 
+	var q string
 	switch rule.Signal {
 	case "cost_burn":
-		// Sum cost over the window per agent, pick the highest-cost scope. The
-		// continuous aggregate is real-time (materialized_only=false), so runs in
-		// the un-materialized tail — including one at now() — are counted.
-		// Per-scope fan-out for multi-agent rules is a scheduler concern (Task 12);
-		// here we evaluate the single scope: the named agent, or the top agent when
-		// the rule is unscoped.
-		const q = `
-			SELECT agent_name,
-			       coalesce(sum(cost_usd), 0)::double precision AS value,
-			       coalesce(sum(total_runs), 0)::int            AS cnt
+		q = `
+			SELECT coalesce(sum(cost_usd), 0)::double precision,
+			       coalesce(sum(total_runs), 0)::int
 			FROM agent_runs_5m
 			WHERE project_id = $1
 			  AND ($2 = '' OR agent_name = $2)
-			  AND bucket >= now() - ($3 * interval '1 second')
-			GROUP BY agent_name
-			ORDER BY value DESC
-			LIMIT 1`
-		var (
-			scope string
-			value float64
-			count int
-		)
-		err := ev.pool.QueryRow(ctx, q, rule.ProjectID, agentFilter, window).Scan(&scope, &value, &count)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return 0, agentFilter, 0, nil // no runs in window: not breached
-		}
-		if err != nil {
-			return 0, "", 0, err
-		}
-		return value, scope, count, nil
+			  AND bucket >= now() - ($3 * interval '1 second')`
+	case "run_failure":
+		// Completion rate over the window. Coalesce to 1 (fully healthy) when the
+		// window is empty so a `<` rule doesn't fire on no data.
+		q = `
+			SELECT coalesce(sum(completed_runs)::float8 / nullif(sum(total_runs), 0), 1),
+			       coalesce(sum(total_runs), 0)::int
+			FROM agent_runs_5m
+			WHERE project_id = $1
+			  AND ($2 = '' OR agent_name = $2)
+			  AND bucket >= now() - ($3 * interval '1 second')`
+	case "termination_shift":
+		// Bad-termination share (error/timeout/max_steps_reached over total).
+		q = `
+			SELECT coalesce(sum(bad_termination_runs)::float8 / nullif(sum(total_runs), 0), 0),
+			       coalesce(sum(total_runs), 0)::int
+			FROM agent_runs_5m
+			WHERE project_id = $1
+			  AND ($2 = '' OR agent_name = $2)
+			  AND bucket >= now() - ($3 * interval '1 second')`
+	case "duration_p95":
+		// Query-time percentile on the raw hypertable — TimescaleDB caggs can't
+		// materialize ordered-set aggregates, so this is by design.
+		q = `
+			SELECT coalesce(percentile_disc(0.95) WITHIN GROUP (ORDER BY duration_ms), 0)::float8,
+			       count(*)::int
+			FROM agent_runs
+			WHERE project_id = $1
+			  AND ($2 = '' OR agent_name = $2)
+			  AND timestamp >= now() - ($3 * interval '1 second')`
+	case "tool_failure":
+		// Tool failure rate from agent_steps (joined to agent_runs for agent
+		// scoping, since steps carry no agent_name). The denominator — steps that
+		// reported a tool_success — is the count for the min_requests guard.
+		q = `
+			SELECT coalesce(
+			         count(*) FILTER (WHERE s.tool_success IS FALSE)::float8
+			         / nullif(count(*) FILTER (WHERE s.tool_success IS NOT NULL), 0), 0),
+			       count(*) FILTER (WHERE s.tool_success IS NOT NULL)::int
+			FROM agent_steps s
+			JOIN agent_runs r ON r.id = s.agent_run_id AND r.project_id = s.project_id
+			WHERE s.project_id = $1
+			  AND ($2 = '' OR r.agent_name = $2)
+			  AND s.timestamp >= now() - ($3 * interval '1 second')`
+	case "eval_regression":
+		// Average correctness over the window (joined to agent_runs for agent
+		// scoping). Coalesce to 1 on empty so a `<` rule doesn't fire on no data.
+		q = `
+			SELECT coalesce(avg(e.correctness)::float8, 1),
+			       count(e.correctness)::int
+			FROM agent_evaluations e
+			JOIN agent_runs r ON r.id = e.agent_run_id AND r.project_id = e.project_id
+			WHERE e.project_id = $1
+			  AND ($2 = '' OR r.agent_name = $2)
+			  AND e.evaluated_at >= now() - ($3 * interval '1 second')`
 	default:
 		return 0, "", 0, fmt.Errorf("alerting: signal %q not implemented", rule.Signal)
+	}
+
+	var (
+		value float64
+		count int
+	)
+	err := ev.pool.QueryRow(ctx, q, rule.ProjectID, agentFilter, window).Scan(&value, &count)
+	if err == nil {
+		return value, scope, count, nil
+	}
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return 0, scope, 0, nil // no data in window: not breached
+	default:
+		return 0, "", 0, err
 	}
 }
 
