@@ -142,6 +142,11 @@ func (app *application) ingestAgentRunFinishHandler(w http.ResponseWriter, r *ht
 	// alert failure must never fail the run-finish response. agent_name isn't in
 	// the finish payload, so the run is fetched by its (id, timestamp) PK window
 	// first. Uses a fresh context — r's is canceled once the handler returns.
+	// Skipped when the evaluator isn't wired (e.g. tests, alerting disabled).
+	if app.evaluator == nil {
+		app.noContentResponse(w)
+		return
+	}
 	go func(pid, rid uuid.UUID, ts time.Time, loop bool, status string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
