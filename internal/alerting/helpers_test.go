@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 
@@ -80,5 +81,33 @@ func seedFinishedRun(t *testing.T, s store.Storage, projectID uuid.UUID, agentNa
 	require.NoError(t, s.AgentRuns.Finish(ctx, run.ID, run.Timestamp, store.AgentRunFinish{
 		Status:       "completed",
 		TotalCostUSD: &cost,
+	}))
+}
+
+// enqueueTestJob upserts a fired alert_event and enqueues a due notification_job
+// in one transaction (transactional outbox), mirroring the store's
+// notification_jobs test so the delivery worker has a claimable job.
+func enqueueTestJob(t *testing.T, s store.Storage, projectID, ruleID uuid.UUID) {
+	t.Helper()
+	ctx := context.Background()
+	now := time.Now()
+	ev := &store.AlertEvent{
+		RuleID:          ruleID,
+		ProjectID:       projectID,
+		Fingerprint:     []byte(fmt.Sprintf("fp-%d", now.UnixNano())),
+		State:           "fired",
+		LastFiredAt:     &now,
+		LastEvaluatedAt: now,
+	}
+	require.NoError(t, withPoolTx(testPool, ctx, func(tx pgx.Tx) error {
+		if err := s.AlertEvents.Upsert(ctx, tx, ev); err != nil {
+			return err
+		}
+		return s.NotificationJobs.Enqueue(ctx, tx, &store.NotificationJob{
+			AlertEventID: ev.ID,
+			Channel:      "email",
+			Payload:      []byte(`{"to":"a@b.c"}`),
+			RunAfter:     now,
+		})
 	}))
 }
