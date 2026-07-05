@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/keelwave/keelwave/internal/store"
 	"golang.org/x/sync/errgroup"
@@ -97,6 +100,7 @@ type ingestAgentRunFinishPayload struct {
 //	@Security		ApiKeyAuth
 //	@Router			/ingest/agent/runs/{runID}/finish [post]
 func (app *application) ingestAgentRunFinishHandler(w http.ResponseWriter, r *http.Request) {
+	projectID := projectIDFromContext(r.Context())
 	runID, err := parseUUIDParam(r, "runID")
 	if err != nil {
 		app.badRequestResponse(w, r, err)
@@ -133,6 +137,23 @@ func (app *application) ingestAgentRunFinishHandler(w http.ResponseWriter, r *ht
 		}
 		return
 	}
+
+	// Event-rule evaluation (loop, run_failure) runs off the ingest hot path: an
+	// alert failure must never fail the run-finish response. agent_name isn't in
+	// the finish payload, so the run is fetched by its (id, timestamp) PK window
+	// first. Uses a fresh context — r's is canceled once the handler returns.
+	go func(pid, rid uuid.UUID, ts time.Time, loop bool, status string) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		run, err := app.store.AgentRuns.GetByID(ctx, pid, rid, ts.Add(-time.Second), ts.Add(time.Second))
+		if err != nil {
+			app.logger.Warnw("run-finish alert: run lookup failed", "err", err)
+			return
+		}
+		if err := app.evaluator.EvaluateRunFinish(ctx, pid, run.AgentName, loop, status); err != nil {
+			app.logger.Warnw("run-finish alert eval failed", "err", err)
+		}
+	}(projectID, runID, payload.Timestamp, payload.LoopDetected, payload.Status)
 
 	app.noContentResponse(w)
 }
