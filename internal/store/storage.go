@@ -132,6 +132,12 @@ type Storage struct {
 		Upsert(ctx context.Context, tx pgx.Tx, e *AlertEvent) error
 		ListByProject(ctx context.Context, projectID uuid.UUID, limit int) ([]*AlertEvent, error)
 	}
+	NotificationJobs interface {
+		Enqueue(ctx context.Context, tx pgx.Tx, j *NotificationJob) error
+		Claim(ctx context.Context, limit int) ([]*NotificationJob, error)
+		MarkDone(ctx context.Context, id uuid.UUID) error
+		MarkRetry(ctx context.Context, id uuid.UUID, errMsg string, runAfter time.Time, dead bool) error
+	}
 }
 
 func withTx(pool *pgxpool.Pool, ctx context.Context, fn func(pgx.Tx) error) error {
@@ -170,5 +176,6 @@ func NewStorage(pool *pgxpool.Pool) Storage {
 		AgentEvaluations:    &AgentEvaluationStore{pool: pool},
 		AlertRules:          &AlertRuleStore{pool: pool},
 		AlertEvents:         &AlertEventStore{pool: pool},
+		NotificationJobs:    &NotificationJobStore{pool: pool},
 	}
 }
