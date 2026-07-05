@@ -183,6 +183,13 @@ func (app *application) mount() *chi.Mux {
 							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Post("/", app.createKeyHandler)
 							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Delete("/{keyID}", app.deleteKeyHandler)
 						})
+
+						r.Route("/alert-rules", func(r chi.Router) {
+							r.With(app.requireOrgRoleMiddleware(RoleLevelMember)).Get("/", app.listAlertRulesHandler)
+							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Post("/", app.createAlertRuleHandler)
+							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Patch("/{ruleID}", app.updateAlertRuleHandler)
+							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Delete("/{ruleID}", app.deleteAlertRuleHandler)
+						})
 					})
 				})
 			})
