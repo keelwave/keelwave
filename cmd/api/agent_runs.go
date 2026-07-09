@@ -148,6 +148,14 @@ func (app *application) ingestAgentRunFinishHandler(w http.ResponseWriter, r *ht
 		return
 	}
 	go func(pid, rid uuid.UUID, ts time.Time, loop bool, status string) {
+		// Best-effort alerting must never take the process down: a panic here
+		// (e.g. a nil deref if the pool/store is torn down during shutdown) is
+		// logged and swallowed rather than propagated out of the goroutine.
+		defer func() {
+			if r := recover(); r != nil {
+				app.logger.Errorw("run-finish alert goroutine panic", "panic", r)
+			}
+		}()
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		run, err := app.store.AgentRuns.GetByID(ctx, pid, rid, ts.Add(-time.Second), ts.Add(time.Second))

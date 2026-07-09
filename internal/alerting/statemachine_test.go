@@ -29,6 +29,25 @@ func TestNextAggregate_pendingThenFireAfterFor(t *testing.T) {
 	assert.Equal(t, "fire", d.Notify)
 }
 
+// A resolved alert that re-breaches must restart the ForSeconds entry hysteresis.
+// The resolved event still carries first_breached_at from the prior cycle; if
+// settle reuses that stale timestamp, the `for` wait is already "elapsed" and the
+// alert fires on the very first re-breach tick. Regression test for the
+// projectEvent/persist first_breached_at reset on entry to pending.
+func TestSettle_reBreachAfterResolveRestartsForHysteresis(t *testing.T) {
+	now := time.Now()
+	rule := Rule{ForSeconds: 60}
+	stale := now.Add(-10 * time.Minute) // breach time from the previous cycle
+	resolved := &Event{State: "resolved", FirstBreachedAt: &stale}
+
+	d := settle(rule, resolved, Eval{Breached: true, Value: 9, Now: now})
+
+	assert.Equal(t, "pending", d.NextState,
+		"re-breach after resolve must re-enter pending and wait ForSeconds, not fire on the stale first_breached_at")
+	assert.Equal(t, "", d.Notify,
+		"no fire notification until ForSeconds elapses on the fresh breach cycle")
+}
+
 func TestNextAggregate_resolveWithHysteresis(t *testing.T) {
 	now := time.Now()
 	rule := Rule{KeepFiringForSeconds: 60}

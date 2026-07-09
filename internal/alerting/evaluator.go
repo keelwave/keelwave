@@ -115,7 +115,11 @@ func projectEvent(prev *Event, d Decision, now time.Time) *Event {
 		next.FiredAt = prev.FiredAt
 		next.RecoveringSince = prev.RecoveringSince
 	}
-	if d.NextState == "pending" && next.FirstBreachedAt == nil {
+	// Reset first_breached_at on every entry into pending (from inactive or
+	// resolved), not just the first time it's nil. A resolved event carries a
+	// non-nil timestamp from the prior cycle; reusing it would make the ForSeconds
+	// wait elapse instantly on re-breach, firing without hysteresis.
+	if d.NextState == "pending" && prevState != "pending" {
 		next.FirstBreachedAt = &now
 	}
 	if d.Notify == "fire" {
@@ -132,8 +136,19 @@ func (ev *Evaluator) persist(ctx context.Context, rule *store.AlertRule, live *s
 	defer cancel()
 	return withPoolTx(ev.pool, ctx, func(tx pgx.Tx) error {
 		e := live
+		prevState := "inactive"
 		if e == nil {
 			e = &store.AlertEvent{RuleID: rule.ID, ProjectID: rule.ProjectID, Fingerprint: fp, ScopeLabel: scope}
+		} else {
+			prevState = live.State
+		}
+		// Stamp first_breached_at when a fresh breach cycle begins: entering
+		// pending or firing from a non-breaching state (a brand-new event, or a
+		// re-breach after resolution). Resetting on re-breach restarts the
+		// ForSeconds entry hysteresis; carrying the prior cycle's timestamp would
+		// make the `for` wait elapse instantly and fire on the first re-breach tick.
+		if (d.NextState == "pending" || d.NextState == "firing") &&
+			(prevState == "inactive" || prevState == "resolved") {
 			e.FirstBreachedAt = &now
 		}
 		e.State = d.NextState
