@@ -119,6 +119,26 @@ type Storage struct {
 		Insert(ctx context.Context, e *AgentEvaluation) error
 		ListByRun(ctx context.Context, runID uuid.UUID) ([]*AgentEvaluation, error)
 	}
+	AlertRules interface {
+		Create(ctx context.Context, r *AlertRule) error
+		GetByID(ctx context.Context, id, projectID uuid.UUID) (*AlertRule, error)
+		ListByProject(ctx context.Context, projectID uuid.UUID) ([]*AlertRule, error)
+		ListEnabled(ctx context.Context) ([]*AlertRule, error)
+		Update(ctx context.Context, r *AlertRule) error
+		Delete(ctx context.Context, id, projectID uuid.UUID) error
+	}
+	AlertEvents interface {
+		GetLive(ctx context.Context, ruleID uuid.UUID, fingerprint []byte) (*AlertEvent, error)
+		Upsert(ctx context.Context, tx pgx.Tx, e *AlertEvent) error
+		FireEvent(ctx context.Context, tx pgx.Tx, e *AlertEvent, cooldownSeconds int) (uuid.UUID, bool, error)
+		ListByProject(ctx context.Context, projectID uuid.UUID, limit int) ([]*AlertEvent, error)
+	}
+	NotificationJobs interface {
+		Enqueue(ctx context.Context, tx pgx.Tx, j *NotificationJob) error
+		Claim(ctx context.Context, limit int) ([]*NotificationJob, error)
+		MarkDone(ctx context.Context, id uuid.UUID) error
+		MarkRetry(ctx context.Context, id uuid.UUID, errMsg string, runAfter time.Time, dead bool) error
+	}
 }
 
 func withTx(pool *pgxpool.Pool, ctx context.Context, fn func(pgx.Tx) error) error {
@@ -155,5 +175,8 @@ func NewStorage(pool *pgxpool.Pool) Storage {
 		AgentSteps:          &AgentStepStore{pool: pool},
 		AgentTools:          &AgentToolStore{pool: pool},
 		AgentEvaluations:    &AgentEvaluationStore{pool: pool},
+		AlertRules:          &AlertRuleStore{pool: pool},
+		AlertEvents:         &AlertEventStore{pool: pool},
+		NotificationJobs:    &NotificationJobStore{pool: pool},
 	}
 }

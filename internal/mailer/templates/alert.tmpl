@@ -1,0 +1,17 @@
+{{define "subject"}}keelwave alert: {{.rule_name}}{{end}}
+
+{{define "body"}}
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  </head>
+  <body>
+    <h2>keelwave alert: {{.rule_name}}</h2>
+    <p>Signal <b>{{.signal}}</b> for agent <b>{{.scope}}</b> — value {{.value}} {{.comparator}} {{.threshold}} over {{.window}}.</p>
+    <p>{{.transition}} at {{.fired_at}}.</p>
+    <p>— The keelwave team<br><a href="https://keelwave.com">keelwave.com</a></p>
+  </body>
+</html>
+{{end}}

@@ -10,19 +10,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
+	"github.com/keelwave/keelwave/internal/alerting"
 	"github.com/keelwave/keelwave/internal/batch"
 	"github.com/keelwave/keelwave/internal/mailer"
 	"github.com/keelwave/keelwave/internal/store"
 )
 
 type application struct {
-	config   config
-	pool     *pgxpool.Pool
-	store    store.Storage
-	batchers *batch.Batchers
-	mailer   mailer.Client
-	srv      *http.Server
-	logger   *zap.SugaredLogger
+	config    config
+	pool      *pgxpool.Pool
+	store     store.Storage
+	batchers  *batch.Batchers
+	mailer    mailer.Client
+	logger    *zap.SugaredLogger
+	evaluator *alerting.Evaluator
+	scheduler *alerting.Scheduler
+	worker    *alerting.Worker
+	srv       *http.Server
 }
 
 type config struct {
@@ -182,6 +186,13 @@ func (app *application) mount() *chi.Mux {
 							r.With(app.requireOrgRoleMiddleware(RoleLevelMember)).Get("/", app.listKeysHandler)
 							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Post("/", app.createKeyHandler)
 							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Delete("/{keyID}", app.deleteKeyHandler)
+						})
+
+						r.Route("/alert-rules", func(r chi.Router) {
+							r.With(app.requireOrgRoleMiddleware(RoleLevelMember)).Get("/", app.listAlertRulesHandler)
+							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Post("/", app.createAlertRuleHandler)
+							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Patch("/{ruleID}", app.updateAlertRuleHandler)
+							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Delete("/{ruleID}", app.deleteAlertRuleHandler)
 						})
 					})
 				})

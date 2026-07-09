@@ -11,6 +11,8 @@ import (
 	"go.uber.org/zap"
 
 	_ "github.com/keelwave/keelwave/docs"
+	"github.com/keelwave/keelwave/internal/alerting"
+	"github.com/keelwave/keelwave/internal/alerting/channels"
 	"github.com/keelwave/keelwave/internal/batch"
 	"github.com/keelwave/keelwave/internal/db"
 	"github.com/keelwave/keelwave/internal/env"
@@ -106,6 +108,17 @@ func main() {
 		logger:   logger,
 	}
 
+	reg := channels.Registry{"email": channels.NewEmail(app.mailer)}
+	evaluator := alerting.NewEvaluator(pool, app.store, logger)
+	worker := alerting.NewWorker(app.store, reg, logger)
+	scheduler := alerting.NewScheduler(evaluator, app.store, logger,
+		parseDurationOr("ALERT_EVAL_INTERVAL", 30*time.Second))
+	app.evaluator = evaluator
+	app.worker = worker
+	app.scheduler = scheduler
+	worker.Start(rootCtx)
+	scheduler.Start(rootCtx)
+
 	mux := app.mount()
 	srvErr := make(chan error, 1)
 	go func() {
@@ -135,6 +148,12 @@ func main() {
 	}
 	if err := batchers.Stop(shutCtx); err != nil {
 		logger.Warnw("batch drain incomplete", "err", err)
+	}
+	if err := scheduler.Stop(shutCtx); err != nil {
+		logger.Warnw("scheduler stop", "err", err)
+	}
+	if err := worker.Stop(shutCtx); err != nil {
+		logger.Warnw("worker stop", "err", err)
 	}
 	pool.Close()
 	logger.Info("shutdown complete")

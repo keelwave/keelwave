@@ -7,6 +7,7 @@ const (
 	maxRetries     = 3
 	InviteTemplate = "invite.tmpl"
 	VerifyTemplate = "verify.tmpl"
+	AlertTemplate  = "alert.tmpl"
 )
 
 //go:embed "templates"
