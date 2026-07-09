@@ -20,6 +20,7 @@ type Scheduler struct {
 	interval time.Duration
 	done     chan struct{}
 	wg       sync.WaitGroup
+	stopOnce sync.Once
 }
 
 // NewScheduler builds a scheduler that runs ev.EvaluateAggregate for each enabled
@@ -67,7 +68,9 @@ func (sc *Scheduler) tick(ctx context.Context) {
 // Stop signals the loop to exit and waits for the goroutine to finish, returning
 // ctx.Err() if the shutdown deadline fires first.
 func (sc *Scheduler) Stop(ctx context.Context) error {
-	close(sc.done)
+	// Idempotent: SIGINT followed by SIGTERM could call Stop twice; closing an
+	// already-closed channel would panic.
+	sc.stopOnce.Do(func() { close(sc.done) })
 	stopped := make(chan struct{})
 	go func() { sc.wg.Wait(); close(stopped) }()
 	select {

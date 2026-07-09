@@ -21,7 +21,8 @@ func TestBuildPayload_MergesRecipientAndKeys(t *testing.T) {
 		ChannelConfig: json.RawMessage(`{"to":"ops@acme.com"}`),
 	}
 
-	b := buildPayload(rule, "agent-x", 9.0, "fire", time.Now())
+	b, err := buildPayload(rule, "agent-x", 9.0, "fire", time.Now())
+	require.NoError(t, err)
 
 	var m map[string]any
 	require.NoError(t, json.Unmarshal(b, &m))

@@ -88,7 +88,10 @@ func (ev *Evaluator) persistEvent(ctx context.Context, rule *store.AlertRule, fp
 		if !fired {
 			return nil
 		}
-		payload := buildPayload(rule, scope, 0, "fire", now)
+		payload, err := buildPayload(rule, scope, 0, "fire", now)
+		if err != nil {
+			return err
+		}
 		return ev.s.NotificationJobs.Enqueue(ctx, tx, &store.NotificationJob{
 			AlertEventID: id, Channel: rule.Channel, Payload: payload, RunAfter: now,
 		})

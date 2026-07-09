@@ -20,11 +20,12 @@ const (
 // Worker drains notification_jobs and delivers each via its channel Sender,
 // retrying failures with exponential backoff until maxAttempts.
 type Worker struct {
-	s    store.Storage
-	reg  channels.Registry
-	log  *zap.SugaredLogger
-	done chan struct{}
-	wg   sync.WaitGroup
+	s        store.Storage
+	reg      channels.Registry
+	log      *zap.SugaredLogger
+	done     chan struct{}
+	wg       sync.WaitGroup
+	stopOnce sync.Once
 }
 
 // NewWorker builds a delivery worker that drains notification_jobs and sends
@@ -56,7 +57,9 @@ func (w *Worker) Start(ctx context.Context) {
 // Stop signals the loop to exit and waits for the goroutine to finish, returning
 // ctx.Err() if the shutdown deadline fires first.
 func (w *Worker) Stop(ctx context.Context) error {
-	close(w.done)
+	// Idempotent: a double Stop (e.g. two shutdown signals) must not panic on an
+	// already-closed channel.
+	w.stopOnce.Do(func() { close(w.done) })
 	stopped := make(chan struct{})
 	go func() { w.wg.Wait(); close(stopped) }()
 	select {

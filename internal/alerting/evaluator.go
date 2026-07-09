@@ -169,7 +169,10 @@ func (ev *Evaluator) persist(ctx context.Context, rule *store.AlertRule, live *s
 			return err
 		}
 		if d.Notify != "" {
-			payload := buildPayload(rule, scope, value, d.Notify, now)
+			payload, err := buildPayload(rule, scope, value, d.Notify, now)
+			if err != nil {
+				return err
+			}
 			if err := ev.s.NotificationJobs.Enqueue(ctx, tx, &store.NotificationJob{
 				AlertEventID: e.ID, Channel: rule.Channel, Payload: payload, RunAfter: now,
 			}); err != nil {
@@ -311,7 +314,7 @@ func compare(value float64, comparator string, threshold float64) bool {
 // notification_jobs row. Keys match the mailer template; the rule's
 // channel_config is merged in so the channel sender finds its target (email's
 // "to", webhook's "url") in the payload.
-func buildPayload(rule *store.AlertRule, scope string, value float64, kind string, now time.Time) []byte {
+func buildPayload(rule *store.AlertRule, scope string, value float64, kind string, now time.Time) ([]byte, error) {
 	m := map[string]any{
 		"rule_name":   rule.Name,
 		"signal":      rule.Signal,
@@ -328,19 +331,22 @@ func buildPayload(rule *store.AlertRule, scope string, value float64, kind strin
 	if rule.WindowSeconds != nil {
 		m["window"] = *rule.WindowSeconds
 	}
-	// Merge channel_config (the recipient); alert fields win on key clash.
+	// Merge channel_config (the recipient); alert fields win on key clash. A
+	// malformed config would silently drop the recipient (e.g. email "to"),
+	// producing a job that only fails at delivery — surface it here instead so the
+	// enclosing tx rolls back and the evaluator logs the misconfigured rule.
 	if len(rule.ChannelConfig) > 0 {
 		var cc map[string]any
-		if err := json.Unmarshal(rule.ChannelConfig, &cc); err == nil {
-			for k, v := range cc {
-				if _, exists := m[k]; !exists {
-					m[k] = v
-				}
+		if err := json.Unmarshal(rule.ChannelConfig, &cc); err != nil {
+			return nil, fmt.Errorf("alerting: invalid channel_config for rule %s: %w", rule.Name, err)
+		}
+		for k, v := range cc {
+			if _, exists := m[k]; !exists {
+				m[k] = v
 			}
 		}
 	}
-	b, _ := json.Marshal(m)
-	return b
+	return json.Marshal(m)
 }
 
 // withPoolTx runs fn inside a transaction, mirroring store.withTx but local to the

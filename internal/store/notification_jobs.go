@@ -38,7 +38,11 @@ func (s *NotificationJobStore) Enqueue(ctx context.Context, tx pgx.Tx, j *Notifi
 }
 
 // Claim atomically leases up to `limit` due pending jobs using FOR UPDATE SKIP
-// LOCKED, so concurrent workers never grab the same row. Marks locked_at.
+// LOCKED, so concurrent workers never grab the same row within a transaction,
+// and flips them to 'processing' so a later poll (or another replica) can't
+// re-claim the same rows once this claim commits — SKIP LOCKED only guards
+// concurrent open transactions, not committed 'pending' rows. MarkDone/MarkRetry
+// move the job out of 'processing' (done/dead) or back to 'pending' for retry.
 func (s *NotificationJobStore) Claim(ctx context.Context, limit int) ([]*NotificationJob, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
@@ -50,7 +54,7 @@ func (s *NotificationJobStore) Claim(ctx context.Context, limit int) ([]*Notific
 			FOR UPDATE SKIP LOCKED
 			LIMIT $1
 		)
-		UPDATE notification_jobs j SET locked_at = now()
+		UPDATE notification_jobs j SET status = 'processing', locked_at = now()
 		FROM claimed WHERE j.id = claimed.id
 		RETURNING j.id, j.alert_event_id, j.channel, j.payload, j.status, j.attempts,
 			j.run_after, j.locked_at, j.last_error, j.created_at`
