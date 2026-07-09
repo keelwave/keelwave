@@ -80,6 +80,33 @@ func (s *AlertEventStore) Upsert(ctx context.Context, tx pgx.Tx, e *AlertEvent) 
 		e.LastValue, e.LastEvaluatedAt).Scan(&e.ID)
 }
 
+// FireEvent atomically upserts a fired event guarded by cooldownSeconds, using the
+// partial unique index alert_events_live_idx (rule_id, fingerprint WHERE state <>
+// 'resolved') as the conflict arbiter. Exactly one concurrent caller wins the
+// insert-or-cooldown race and returns (id, true); a caller whose conflict finds the
+// cooldown unelapsed matches no row and returns (uuid.Nil, false). Runs in the
+// caller's tx so the fire + its notification enqueue commit atomically.
+func (s *AlertEventStore) FireEvent(ctx context.Context, tx pgx.Tx, e *AlertEvent, cooldownSeconds int) (uuid.UUID, bool, error) {
+	const q = `
+		INSERT INTO alert_events (rule_id, project_id, fingerprint, scope_label, state,
+			first_breached_at, fired_at, last_fired_at, last_evaluated_at)
+		VALUES ($1,$2,$3,$4,'fired', now(), now(), now(), now())
+		ON CONFLICT (rule_id, fingerprint) WHERE state <> 'resolved'
+		DO UPDATE SET fired_at = now(), last_fired_at = now(), last_evaluated_at = now()
+			WHERE alert_events.last_fired_at IS NULL
+			   OR alert_events.last_fired_at <= now() - make_interval(secs => $5)
+		RETURNING id`
+	var id uuid.UUID
+	err := tx.QueryRow(ctx, q, e.RuleID, e.ProjectID, e.Fingerprint, e.ScopeLabel, cooldownSeconds).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, false, nil
+	}
+	if err != nil {
+		return uuid.Nil, false, err
+	}
+	return id, true, nil
+}
+
 func (s *AlertEventStore) ListByProject(ctx context.Context, projectID uuid.UUID, limit int) ([]*AlertEvent, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()

@@ -35,9 +35,7 @@ func NewWorker(s store.Storage, reg channels.Registry, log *zap.SugaredLogger) *
 
 // Start launches the drain loop in a goroutine; it exits on ctx cancel or Stop.
 func (w *Worker) Start(ctx context.Context) {
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
+	w.wg.Go(func() {
 		t := time.NewTicker(workerInterval)
 		defer t.Stop()
 		for {
@@ -52,7 +50,7 @@ func (w *Worker) Start(ctx context.Context) {
 				}
 			}
 		}
-	}()
+	})
 }
 
 // Stop signals the loop to exit and waits for the goroutine to finish, returning
@@ -80,16 +78,22 @@ func (w *Worker) drainOnce(ctx context.Context) (int, error) {
 	for _, j := range jobs {
 		sender, ok := w.reg.For(j.Channel)
 		if !ok {
-			_ = w.s.NotificationJobs.MarkRetry(ctx, j.ID, "unknown channel", time.Now(), true)
+			if err := w.s.NotificationJobs.MarkRetry(ctx, j.ID, "unknown channel", time.Now(), true); err != nil {
+				w.log.Warnw("notification mark retry failed", "job", j.ID, "err", err)
+			}
 			continue
 		}
 		if err := sender.Send(ctx, j.Payload); err != nil {
 			dead := j.Attempts+1 >= maxAttempts
 			backoff := time.Now().Add(time.Duration(1<<j.Attempts) * time.Second)
-			_ = w.s.NotificationJobs.MarkRetry(ctx, j.ID, err.Error(), backoff, dead)
+			if merr := w.s.NotificationJobs.MarkRetry(ctx, j.ID, err.Error(), backoff, dead); merr != nil {
+				w.log.Warnw("notification mark retry failed", "job", j.ID, "err", merr)
+			}
 			continue
 		}
-		_ = w.s.NotificationJobs.MarkDone(ctx, j.ID)
+		if err := w.s.NotificationJobs.MarkDone(ctx, j.ID); err != nil {
+			w.log.Warnw("notification mark done failed", "job", j.ID, "err", err)
+		}
 	}
 	return len(jobs), nil
 }

@@ -12,12 +12,9 @@ import (
 )
 
 // EvaluateRunFinish evaluates the project's enabled event-class rules against a
-// just-finished run. For each rule whose signal matches the run's outcome
-// (loop -> loopDetected, run_failure -> status=="failed") and whose optional
-// agent_name filter matches, it advances the point-in-time state machine
-// (cooldown dedup via the live event's last_fired_at) and, on a fire decision,
-// persists a fired event + enqueues its notification in one transaction
-// (transactional outbox). Called off the ingest hot path.
+// just-finished run: for each matching rule (signal fits the outcome, agent filter
+// matches, past cooldown) it fires a notification via the transactional outbox.
+// Called off the ingest hot path.
 func (ev *Evaluator) EvaluateRunFinish(ctx context.Context, projectID uuid.UUID, agentName string, loopDetected bool, status string) error {
 	rules, err := ev.s.AlertRules.ListByProject(ctx, projectID)
 	if err != nil {
@@ -50,10 +47,11 @@ func (ev *Evaluator) EvaluateRunFinish(ctx context.Context, projectID uuid.UUID,
 		if d.Notify != "fire" {
 			continue // within cooldown: suppressed
 		}
-		// A per-rule persist error (including the EXPECTED unique-index violation
-		// on alert_events_live_idx when two finishes race the first fire) must not
-		// suppress the remaining rules — log and continue, mirroring scheduler.tick.
-		if err := ev.persistEvent(ctx, rule, live, fp, agentName, now); err != nil {
+		// A per-rule persist error must not skip the remaining rules. The
+		// authoritative cooldown/first-fire guard is inside persistEvent's atomic
+		// FireEvent, so a concurrent finish that loses the race enqueues nothing
+		// rather than erroring here.
+		if err := ev.persistEvent(ctx, rule, fp, agentName, now); err != nil {
 			ev.log.Warnw("alert event persist failed", "rule", rule.ID, "err", err)
 			continue
 		}
@@ -73,28 +71,26 @@ func eventBreached(signal string, loopDetected bool, status string) bool {
 	}
 }
 
-// persistEvent writes the fired event + enqueues its notification in one
-// transaction. Unlike persist (aggregate), event rules are point-in-time: the
-// row is always "fired", last_fired_at is stamped to now for cooldown dedup, and
-// a notification is always enqueued — the caller only reaches here on a fire
-// decision.
-func (ev *Evaluator) persistEvent(ctx context.Context, rule *store.AlertRule, live *store.AlertEvent, fp []byte, scope string, now time.Time) error {
+// persistEvent atomically fires the event + enqueues its notification in one
+// transaction. FireEvent is the authoritative guard: its cooldown-checked upsert
+// on the partial unique index means only one of two racing finishes commits a fire
+// (the GetLive+NextEvent fast-path in the caller only avoids the tx in the common
+// suppressed case). If this call doesn't win the fire, it enqueues nothing.
+func (ev *Evaluator) persistEvent(ctx context.Context, rule *store.AlertRule, fp []byte, scope string, now time.Time) error {
+	ctx, cancel := context.WithTimeout(ctx, store.QueryTimeoutDuration)
+	defer cancel()
 	return withPoolTx(ev.pool, ctx, func(tx pgx.Tx) error {
-		e := live
-		if e == nil {
-			e = &store.AlertEvent{RuleID: rule.ID, ProjectID: rule.ProjectID, Fingerprint: fp, ScopeLabel: scope}
-			e.FirstBreachedAt = &now
-		}
-		e.State = "fired"
-		e.FiredAt = &now
-		e.LastFiredAt = &now
-		e.LastEvaluatedAt = now
-		if err := ev.s.AlertEvents.Upsert(ctx, tx, e); err != nil {
+		e := &store.AlertEvent{RuleID: rule.ID, ProjectID: rule.ProjectID, Fingerprint: fp, ScopeLabel: scope}
+		id, fired, err := ev.s.AlertEvents.FireEvent(ctx, tx, e, rule.CooldownSeconds)
+		if err != nil {
 			return err
+		}
+		if !fired {
+			return nil
 		}
 		payload := buildPayload(rule, scope, 0, "fire", now)
 		return ev.s.NotificationJobs.Enqueue(ctx, tx, &store.NotificationJob{
-			AlertEventID: e.ID, Channel: rule.Channel, Payload: payload, RunAfter: now,
+			AlertEventID: id, Channel: rule.Channel, Payload: payload, RunAfter: now,
 		})
 	})
 }

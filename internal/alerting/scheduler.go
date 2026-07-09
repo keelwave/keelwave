@@ -30,9 +30,7 @@ func NewScheduler(ev *Evaluator, s store.Storage, log *zap.SugaredLogger, interv
 
 // Start launches the evaluation loop in a goroutine; it exits on ctx cancel or Stop.
 func (sc *Scheduler) Start(ctx context.Context) {
-	sc.wg.Add(1)
-	go func() {
-		defer sc.wg.Done()
+	sc.wg.Go(func() {
 		t := time.NewTicker(sc.interval)
 		defer t.Stop()
 		for {
@@ -45,7 +43,7 @@ func (sc *Scheduler) Start(ctx context.Context) {
 				sc.tick(ctx)
 			}
 		}
-	}()
+	})
 }
 
 // tick lists enabled rules and evaluates each aggregate-class rule; a single

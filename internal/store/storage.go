@@ -130,6 +130,7 @@ type Storage struct {
 	AlertEvents interface {
 		GetLive(ctx context.Context, ruleID uuid.UUID, fingerprint []byte) (*AlertEvent, error)
 		Upsert(ctx context.Context, tx pgx.Tx, e *AlertEvent) error
+		FireEvent(ctx context.Context, tx pgx.Tx, e *AlertEvent, cooldownSeconds int) (uuid.UUID, bool, error)
 		ListByProject(ctx context.Context, projectID uuid.UUID, limit int) ([]*AlertEvent, error)
 	}
 	NotificationJobs interface {

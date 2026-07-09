@@ -32,7 +32,10 @@ func TestAlertRuleHandler_CreateListDelete(t *testing.T) {
 		"signal":   "loop",
 		"severity": "page",
 		"channel":  "email",
-		"enabled":  true,
+		"channel_config": map[string]any{
+			"to": "ops@acme.com",
+		},
+		"enabled": true,
 	}, &created, ts.cookie)
 
 	require.Equal(t, http.StatusCreated, resp.StatusCode, "body=%s", raw)
@@ -81,7 +84,10 @@ func TestAlertRuleHandler_UpdateAppliesFields(t *testing.T) {
 		"severity":  "warn",
 		"channel":   "email",
 		"threshold": 5,
-		"enabled":   true,
+		"channel_config": map[string]any{
+			"to": "ops@acme.com",
+		},
+		"enabled": true,
 	}, &created, ts.cookie)
 	require.Equal(t, http.StatusCreated, resp.StatusCode, "body=%s", raw)
 
@@ -99,7 +105,10 @@ func TestAlertRuleHandler_UpdateAppliesFields(t *testing.T) {
 		"severity":  "page",
 		"channel":   "email",
 		"threshold": 10,
-		"enabled":   false,
+		"channel_config": map[string]any{
+			"to": "ops@acme.com",
+		},
+		"enabled": false,
 	}, &updated, ts.cookie)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "body=%s", raw)
 	assert.Equal(t, "cost burn v2", updated.Data.Name)
@@ -212,7 +221,10 @@ func TestAlertRuleHandler_cooldownDefaults900(t *testing.T) {
 		"signal":   "loop",
 		"severity": "page",
 		"channel":  "email",
-		"enabled":  true,
+		"channel_config": map[string]any{
+			"to": "ops@acme.com",
+		},
+		"enabled": true,
 	}, &created, ts.cookie)
 	require.Equal(t, http.StatusCreated, resp.StatusCode, "body=%s", raw)
 	require.NotEmpty(t, created.Data.ID)

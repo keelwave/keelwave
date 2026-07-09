@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/mail"
 
 	"github.com/google/uuid"
 
@@ -31,7 +32,9 @@ type alertRulePayload struct {
 func (p alertRulePayload) toRule(projectID uuid.UUID) *store.AlertRule {
 	cmp := p.Comparator
 	if cmp == "" {
-		cmp = ">"
+		// Aggregate rules default to the signal's natural direction (lower-is-bad
+		// signals compare "<"); event rules ignore the comparator entirely.
+		cmp = naturalComparator(p.Signal)
 	}
 	// Mirror the schema's DEFAULT 900 (15 min, spec §4.2): an omitted
 	// cooldown_seconds zero-values to 0, and Create always binds it, so a 0 here
@@ -70,6 +73,77 @@ func validAlertClassSignal(class, signal string) bool {
 		}
 	}
 	return false
+}
+
+// lowerIsBad reports whether a signal's metric is "bad" when it falls (completion
+// rate, correctness), so the natural comparator is "<". The rest are higher-is-bad
+// (cost, failure/bad-termination share, latency), natural comparator ">".
+func lowerIsBad(signal string) bool {
+	switch signal {
+	case "run_failure", "eval_regression":
+		return true
+	default:
+		return false
+	}
+}
+
+// naturalComparator is the default comparator for an aggregate signal in its
+// natural alert direction.
+func naturalComparator(signal string) string {
+	if lowerIsBad(signal) {
+		return "<"
+	}
+	return ">"
+}
+
+// validAggregateComparator rejects a comparator that points the wrong way for the
+// signal: lower-is-bad signals may only use "<"/"<=", higher-is-bad only ">"/">=".
+// An empty comparator is allowed (toRule fills the natural default).
+func validAggregateComparator(signal, comparator string) bool {
+	if comparator == "" {
+		return true
+	}
+	if lowerIsBad(signal) {
+		return comparator == "<" || comparator == "<="
+	}
+	return comparator == ">" || comparator == ">="
+}
+
+// validateAlertRulePayload runs the cross-field checks not expressible as struct
+// tags: the class×signal matrix, aggregate comparator direction, and the email
+// channel's required recipient. Returns a non-nil error to surface as a 400.
+func validateAlertRulePayload(p alertRulePayload) error {
+	if !validAlertClassSignal(p.Class, p.Signal) {
+		return fmt.Errorf("signal %q is not valid for class %q", p.Signal, p.Class)
+	}
+	if p.Class == "aggregate" && !validAggregateComparator(p.Signal, p.Comparator) {
+		return fmt.Errorf("comparator %q points the wrong way for signal %q (want %q direction)",
+			p.Comparator, p.Signal, naturalComparator(p.Signal))
+	}
+	if p.Channel == "email" {
+		if err := validateEmailRecipient(p.ChannelConfig); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateEmailRecipient requires channel_config to carry a parseable email
+// address in "to". A dead recipient would otherwise fail every delivery and
+// dead-letter silently.
+func validateEmailRecipient(cfg json.RawMessage) error {
+	var c struct {
+		To string `json:"to"`
+	}
+	if len(cfg) > 0 {
+		if err := json.Unmarshal(cfg, &c); err != nil {
+			return fmt.Errorf("channel_config must be a JSON object: %w", err)
+		}
+	}
+	if _, err := mail.ParseAddress(c.To); err != nil {
+		return fmt.Errorf("email channel requires channel_config.to to be a valid address")
+	}
+	return nil
 }
 
 // authorizeProject resolves the URL-scoped project and confirms it belongs to
@@ -133,8 +207,8 @@ func (app *application) createAlertRuleHandler(w http.ResponseWriter, r *http.Re
 		app.badRequestResponse(w, r, err)
 		return
 	}
-	if !validAlertClassSignal(payload.Class, payload.Signal) {
-		app.badRequestResponse(w, r, fmt.Errorf("signal %q is not valid for class %q", payload.Signal, payload.Class))
+	if err := validateAlertRulePayload(payload); err != nil {
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -212,8 +286,8 @@ func (app *application) updateAlertRuleHandler(w http.ResponseWriter, r *http.Re
 		app.badRequestResponse(w, r, err)
 		return
 	}
-	if !validAlertClassSignal(payload.Class, payload.Signal) {
-		app.badRequestResponse(w, r, fmt.Errorf("signal %q is not valid for class %q", payload.Signal, payload.Class))
+	if err := validateAlertRulePayload(payload); err != nil {
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -228,11 +302,18 @@ func (app *application) updateAlertRuleHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// class + signal are immutable in AlertRules.Update; a body that tries to
+	// change them was validated under the wrong class and must be rejected rather
+	// than silently ignored.
+	if payload.Class != existing.Class || payload.Signal != existing.Signal {
+		app.badRequestResponse(w, r, fmt.Errorf("class and signal are immutable; got class %q signal %q, have class %q signal %q",
+			payload.Class, payload.Signal, existing.Class, existing.Signal))
+		return
+	}
+
 	rule := payload.toRule(projectID)
 	rule.ID = existing.ID
 	rule.CreatedAt = existing.CreatedAt
-	// class + signal are immutable in AlertRules.Update; keep the response
-	// consistent with what is actually persisted.
 	rule.Class = existing.Class
 	rule.Signal = existing.Signal
 

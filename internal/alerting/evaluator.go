@@ -26,6 +26,8 @@ type Evaluator struct {
 	log  *zap.SugaredLogger
 }
 
+// NewEvaluator builds an Evaluator over the pool + store for aggregate and event
+// rule evaluation.
 func NewEvaluator(pool *pgxpool.Pool, s store.Storage, log *zap.SugaredLogger) *Evaluator {
 	return &Evaluator{pool: pool, s: s, log: log}
 }
@@ -47,10 +49,13 @@ func (ev *Evaluator) EvaluateAggregate(ctx context.Context, rule *store.AlertRul
 	if err != nil {
 		return err
 	}
-	if rule.MinRequests > 0 && count < rule.MinRequests {
-		return nil // not enough volume; skip (anti-noise)
-	}
-	breached := compare(value, rule.Comparator, rule.Threshold)
+	// No data (count==0) is never a breach, whatever the comparator direction:
+	// the per-signal coalesce default only reads as "not-breached" in the signal's
+	// natural direction. Below min_requests is likewise not a breach, but we still
+	// run the state machine so a firing alert whose volume drops can recover rather
+	// than freeze in firing.
+	enoughVolume := rule.MinRequests == 0 || count >= rule.MinRequests
+	breached := count > 0 && enoughVolume && compare(value, rule.Comparator, rule.Threshold)
 	fp := Fingerprint(rule.ID, scope)
 	now := time.Now()
 
@@ -74,17 +79,14 @@ func (ev *Evaluator) EvaluateAggregate(ctx context.Context, rule *store.AlertRul
 	return ev.persist(ctx, rule, live, fp, scope, d, value, now)
 }
 
-// settle advances the aggregate state machine within a single evaluation tick.
-// The pure machine deliberately stamps first_breached_at on the inactive->pending
-// edge before it can measure the `for` duration, so a zero-duration rule
-// (for_seconds=0) needs two applications to reach firing. A scheduled tick must
-// fully resolve such zero-duration transitions in one pass, so we iterate —
-// projecting the event forward exactly as persist would — until the state stops
-// changing, carrying the strongest fire/resolve notify seen along the way.
+// settle fully advances the state machine within one tick. The pure machine takes
+// one edge per call, so a for_seconds=0 rule needs two (inactive->pending,
+// pending->firing) to fire in a single tick. We iterate — projecting the event
+// forward as persist would — until the state settles, keeping the strongest notify.
 func settle(rule Rule, evt *Event, e Eval) Decision {
 	notify := ""
 	var d Decision
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		d = NextAggregate(rule, evt, e)
 		if d.Notify != "" {
 			notify = d.Notify
@@ -126,6 +128,8 @@ func projectEvent(prev *Event, d Decision, now time.Time) *Event {
 }
 
 func (ev *Evaluator) persist(ctx context.Context, rule *store.AlertRule, live *store.AlertEvent, fp []byte, scope string, d Decision, value float64, now time.Time) error {
+	ctx, cancel := context.WithTimeout(ctx, store.QueryTimeoutDuration)
+	defer cancel()
 	return withPoolTx(ev.pool, ctx, func(tx pgx.Tx) error {
 		e := live
 		if e == nil {
@@ -138,9 +142,8 @@ func (ev *Evaluator) persist(ctx context.Context, rule *store.AlertRule, live *s
 		if d.Notify == "fire" {
 			e.FiredAt = &now
 		}
-		// Stamp recovery start on entry to recovering — the state machine times
-		// keep_firing_for from this, so set it exactly once on firing->recovering
-		// (not re-stamped on later recovering ticks).
+		// Stamp recovery start once on firing->recovering: keep_firing_for is timed
+		// from here (not re-stamped on later recovering ticks).
 		if d.NextState == "recovering" && (live == nil || live.State != "recovering") {
 			e.RecoveringSince = &now
 		}
@@ -162,23 +165,19 @@ func (ev *Evaluator) persist(ctx context.Context, rule *store.AlertRule, live *s
 	})
 }
 
-// queryMetric resolves the rule's observed value + scope over its window. Returns
-// the observed value, its scope_label, and the denominator count in the window
-// (for the min_requests noise guard).
+// queryMetric resolves the rule's observed value, scope_label, and window count
+// (the min_requests denominator).
 //
-// Scope follows the spec §4.2 two-lifecycle split, keeping the fingerprint stable:
-// a scoped rule (AgentName != nil) filters to that agent and labels the stream
-// with the agent name; an unscoped rule (AgentName == nil) aggregates the whole
-// project (all agents together) under the empty scope. A shared agent-name
-// predicate handles both cases in one query: an empty agentFilter matches every
-// agent, a set one restricts to it. Each query is a pure aggregate (no GROUP BY),
-// so it always returns exactly one row.
+// Scope: a scoped rule (AgentName != nil) filters to that agent and labels the
+// stream with it; an unscoped rule aggregates the whole project under the empty
+// scope (keeps the fingerprint stable; spec §4.2). An empty agentFilter matches
+// every agent, a set one restricts to it. Each query is a pure aggregate, so it
+// returns exactly one row.
 //
-// Signal sources: cost/completion/termination read the agent_runs_5m continuous
-// aggregate (real-time, so the un-materialized tail counts); duration_p95 is a
-// query-time ordered-set aggregate on raw agent_runs (caggs can't materialize
-// percentiles); tool_failure reads agent_steps and eval_regression reads
-// agent_evaluations, each joined to agent_runs for agent scoping.
+// Sources: cost/completion/termination read the agent_runs_5m continuous aggregate
+// (real-time, so the un-materialized tail counts); duration_p95 is a query-time
+// percentile on raw agent_runs; tool_failure/eval_regression join their tables to
+// agent_runs for scoping.
 func (ev *Evaluator) queryMetric(ctx context.Context, rule *store.AlertRule) (float64, string, int, error) {
 	ctx, cancel := context.WithTimeout(ctx, store.QueryTimeoutDuration)
 	defer cancel()
@@ -204,11 +203,13 @@ func (ev *Evaluator) queryMetric(ctx context.Context, rule *store.AlertRule) (fl
 			  AND ($2 = '' OR agent_name = $2)
 			  AND bucket >= now() - ($3 * interval '1 second')`
 	case "run_failure":
-		// Completion rate over the window. Coalesce to 1 (fully healthy) when the
-		// window is empty so a `<` rule doesn't fire on no data.
+		// Completion rate over FINISHED runs only (completed + failed); in-flight
+		// runs must not depress the denominator. Coalesce to 1 (fully healthy) when
+		// no finished runs, so a `<` rule doesn't fire on no data.
 		q = `
-			SELECT coalesce(sum(completed_runs)::float8 / nullif(sum(total_runs), 0), 1),
-			       coalesce(sum(total_runs), 0)::int
+			SELECT coalesce(sum(completed_runs)::float8
+			         / nullif(sum(completed_runs) + sum(failed_runs), 0), 1),
+			       coalesce(sum(completed_runs) + sum(failed_runs), 0)::int
 			FROM agent_runs_5m
 			WHERE project_id = $1
 			  AND ($2 = '' OR agent_name = $2)
@@ -227,15 +228,14 @@ func (ev *Evaluator) queryMetric(ctx context.Context, rule *store.AlertRule) (fl
 		// materialize ordered-set aggregates, so this is by design.
 		q = `
 			SELECT coalesce(percentile_disc(0.95) WITHIN GROUP (ORDER BY duration_ms), 0)::float8,
-			       count(*)::int
+			       count(duration_ms)::int
 			FROM agent_runs
 			WHERE project_id = $1
 			  AND ($2 = '' OR agent_name = $2)
 			  AND timestamp >= now() - ($3 * interval '1 second')`
 	case "tool_failure":
-		// Tool failure rate from agent_steps (joined to agent_runs for agent
-		// scoping, since steps carry no agent_name). The denominator — steps that
-		// reported a tool_success — is the count for the min_requests guard.
+		// Tool failure rate from agent_steps, joined to agent_runs for agent
+		// scoping (steps carry no agent_name). Count = the min_requests denominator.
 		q = `
 			SELECT coalesce(
 			         count(*) FILTER (WHERE s.tool_success IS FALSE)::float8
@@ -313,9 +313,7 @@ func buildPayload(rule *store.AlertRule, scope string, value float64, kind strin
 	if rule.WindowSeconds != nil {
 		m["window"] = *rule.WindowSeconds
 	}
-	// Merge channel_config (carries the recipient: "to" for email, "url" for
-	// webhook) so the channel sender finds its target in the payload. Alert
-	// fields win on key clash.
+	// Merge channel_config (the recipient); alert fields win on key clash.
 	if len(rule.ChannelConfig) > 0 {
 		var cc map[string]any
 		if err := json.Unmarshal(rule.ChannelConfig, &cc); err == nil {
@@ -337,8 +335,10 @@ func withPoolTx(pool *pgxpool.Pool, ctx context.Context, fn func(pgx.Tx) error) 
 	if err != nil {
 		return err
 	}
+	// Safety net if fn panics or an early return is added later; a no-op after a
+	// successful Commit.
+	defer tx.Rollback(ctx)
 	if err := fn(tx); err != nil {
-		_ = tx.Rollback(ctx)
 		return err
 	}
 	return tx.Commit(ctx)
