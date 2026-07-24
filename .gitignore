@@ -9,6 +9,7 @@
 .DS_Store
 
 # Compiled binaries from `go build ./cmd/...` without -o
+/api
 /seeddemo
 
 # Ignore node_modules
@@ -18,3 +19,7 @@ node_modules/
 CLAUDE.private.md
 
 docs/superpowers/
+
+/docs/superpowers/
+/web/public/
+/docs/notes/
