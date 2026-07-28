@@ -71,6 +71,12 @@ func (app *application) ingestAIHandler(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	totalTokens := payload.TotalTokens
+	if totalTokens == nil && payload.InputTokens != nil && payload.OutputTokens != nil {
+		sum := *payload.InputTokens + *payload.OutputTokens
+		totalTokens = &sum
+	}
+
 	t := &store.AITrace{
 		ID:           id,
 		ProjectID:    projectID,
@@ -78,7 +84,7 @@ func (app *application) ingestAIHandler(w http.ResponseWriter, r *http.Request) 
 		Provider:     payload.Provider,
 		InputTokens:  payload.InputTokens,
 		OutputTokens: payload.OutputTokens,
-		TotalTokens:  payload.TotalTokens,
+		TotalTokens:  totalTokens,
 		CostUSD:      cost,
 		LatencyMs:    payload.LatencyMs,
 		Status:       payload.Status,
