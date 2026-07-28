@@ -14,6 +14,7 @@ import (
 	"github.com/keelwave/keelwave/internal/batch"
 	"github.com/keelwave/keelwave/internal/mailer"
 	"github.com/keelwave/keelwave/internal/store"
+	"github.com/keelwave/keelwave/internal/web"
 )
 
 type application struct {
@@ -199,6 +200,10 @@ func (app *application) mount() *chi.Mux {
 			})
 		})
 	})
+
+	// Serve the embedded dashboard for all non-API paths. Mounted last so it
+	// never shadows /v1/* (API, docs, health) — chi matches those routes first.
+	r.Handle("/*", web.Handler())
 
 	return r
 }

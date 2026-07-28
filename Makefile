@@ -1,4 +1,4 @@
-.PHONY: run dev build tidy db-up db-down migrate-create migrate-up migrate-down migrate-force migrate-version gen-docs fmt test seed
+.PHONY: run dev build web-build tidy db-up db-down migrate-create migrate-up migrate-down migrate-force migrate-version gen-docs fmt test seed
 
 MIGRATIONS_PATH = ./cmd/migrate/migrations
 DB_ADDR ?= postgres://keelwave:keelwave@localhost:5432/keelwave?sslmode=disable
@@ -11,6 +11,11 @@ dev:
 
 build:
 	@go build -o bin/api ./cmd/api
+
+# Build the dashboard SPA and copy it into internal/web/dist so `go build`
+# embeds a real dashboard (otherwise only the placeholder index.html ships).
+web-build:
+	@cd web && pnpm install --frozen-lockfile && pnpm build
 
 tidy:
 	@go mod tidy

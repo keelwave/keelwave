@@ -1,0 +1,33 @@
+.git
+.github
+# Dependencies + build artifacts (the web stage installs + builds fresh).
+**/node_modules
+web/dist
+web/.tanstack
+web/.output
+web/.fallow
+# The dashboard is built inside the web stage and overlaid into the Go stage;
+# never ship a pre-built or placeholder copy from the build context.
+internal/web/dist
+docs/notes
+docs/superpowers
+dist
+/api
+/seeddemo
+/bin
+/tmp
+*.log
+.env
+.env*
+.envrc
+.envrc.local
+.idea
+.vscode
+.DS_Store
+CLAUDE.md
+CLAUDE.private.md
+README.md
+.air.toml
+.superpowers
+Dockerfile
+.dockerignore

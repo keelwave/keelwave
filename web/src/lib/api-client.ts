@@ -1,6 +1,9 @@
 import { env } from "@/env"
 
-const BASE_URL = env.VITE_KEELWAVE_API_URL.replace(/\/$/, "")
+// Same-origin by default: the keelwave binary serves this dashboard, so an
+// empty base makes fetches hit relative /v1/* paths on the current origin.
+// VITE_KEELWAVE_API_URL overrides this for split-origin dev.
+const BASE_URL = (env.VITE_KEELWAVE_API_URL ?? "").replace(/\/$/, "")
 
 export class ApiError extends Error {
   constructor(
@@ -33,13 +36,15 @@ async function get<T>(
   path: string,
   params?: Record<string, QueryValue>
 ): Promise<T> {
-  const url = new URL(`${BASE_URL}${path}`)
+  const search = new URLSearchParams()
   if (params) {
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== null)
-        url.searchParams.set(key, String(value))
+        search.set(key, String(value))
     }
   }
+  const qs = search.toString()
+  const url = `${BASE_URL}${path}${qs ? `?${qs}` : ""}`
   const res = await fetch(url, {
     headers: { Accept: "application/json" },
     credentials: "include",
