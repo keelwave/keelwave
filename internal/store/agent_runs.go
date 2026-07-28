@@ -77,7 +77,11 @@ func (s *AgentRunStore) ListByProject(ctx context.Context, projectID uuid.UUID, 
 	const q = `
 		SELECT id, timestamp, project_id, agent_name, status,
 		       termination_reason, loop_detected, loop_step_index,
-		       total_steps, total_tokens,
+		       total_steps,
+		       coalesce(
+		         (SELECT sum(coalesce(t.total_tokens, t.input_tokens + t.output_tokens)) FROM ai_traces t
+		          WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id),
+		         total_tokens) AS total_tokens,
 		       coalesce(
 		         (SELECT sum(t.cost_usd) FROM ai_traces t
 		          WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id),
@@ -119,7 +123,11 @@ func (s *AgentRunStore) GetByID(ctx context.Context, projectID, runID uuid.UUID,
 	const q = `
 		SELECT id, timestamp, project_id, agent_name, status,
 		       termination_reason, loop_detected, loop_step_index,
-		       total_steps, total_tokens,
+		       total_steps,
+		       coalesce(
+		         (SELECT sum(coalesce(t.total_tokens, t.input_tokens + t.output_tokens)) FROM ai_traces t
+		          WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id),
+		         total_tokens) AS total_tokens,
 		       coalesce(
 		         (SELECT sum(t.cost_usd) FROM ai_traces t
 		          WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id),
@@ -214,7 +222,7 @@ func (s *AgentRunStore) RunHealth(ctx context.Context, projectID uuid.UUID, from
 		              WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id),
 		             total_cost_usd))
 		           FILTER (WHERE timestamp >= $2)::float8                                AS avg_cost_usd,
-		       coalesce(avg(total_tokens) FILTER (WHERE timestamp >= $2), 0)::float8     AS avg_tokens,
+		       coalesce(avg(coalesce((SELECT sum(coalesce(t.total_tokens, t.input_tokens + t.output_tokens)) FROM ai_traces t WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id), total_tokens)) FILTER (WHERE timestamp >= $2), 0)::float8     AS avg_tokens,
 		       count(*) FILTER (WHERE timestamp < $2)::int                               AS prev_total_runs
 		FROM agent_runs
 		WHERE project_id = $1 AND timestamp >= $4 AND timestamp < $3
@@ -289,7 +297,7 @@ func (s *AgentRunStore) SummaryWithPrev(ctx context.Context, projectID uuid.UUID
 			       WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id),
 			      total_cost_usd))
 			    FILTER (WHERE timestamp >= $2)::float8                                            AS cur_avg_cost,
-			coalesce(avg(total_tokens) FILTER (WHERE timestamp >= $2), 0)::float8                 AS cur_avg_tokens,
+			coalesce(avg(coalesce((SELECT sum(coalesce(t.total_tokens, t.input_tokens + t.output_tokens)) FROM ai_traces t WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id), total_tokens)) FILTER (WHERE timestamp >= $2), 0)::float8                 AS cur_avg_tokens,
 			coalesce(sum(total_steps) FILTER (WHERE timestamp >= $2), 0)::int                     AS cur_steps,
 			coalesce(percentile_disc(0.50) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE timestamp >= $2), 0)::int AS cur_p50,
 			coalesce(percentile_disc(0.95) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE timestamp >= $2), 0)::int AS cur_p95,
@@ -304,7 +312,7 @@ func (s *AgentRunStore) SummaryWithPrev(ctx context.Context, projectID uuid.UUID
 			       WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id),
 			      total_cost_usd))
 			    FILTER (WHERE timestamp < $2)::float8                                             AS prev_avg_cost,
-			coalesce(avg(total_tokens) FILTER (WHERE timestamp < $2), 0)::float8                  AS prev_avg_tokens,
+			coalesce(avg(coalesce((SELECT sum(coalesce(t.total_tokens, t.input_tokens + t.output_tokens)) FROM ai_traces t WHERE t.agent_run_id = agent_runs.id AND t.project_id = agent_runs.project_id), total_tokens)) FILTER (WHERE timestamp < $2), 0)::float8                  AS prev_avg_tokens,
 			coalesce(sum(total_steps) FILTER (WHERE timestamp < $2), 0)::int                      AS prev_steps,
 			coalesce(percentile_disc(0.50) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE timestamp < $2), 0)::int AS prev_p50,
 			coalesce(percentile_disc(0.95) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE timestamp < $2), 0)::int AS prev_p95,
