@@ -13,7 +13,7 @@ BEGIN
         UPDATE agent_runs r SET
             total_tokens = coalesce((
                 SELECT sum(coalesce(t.total_tokens,
-                                    coalesce(t.input_tokens, 0) + coalesce(t.output_tokens, 0)))
+                                    t.input_tokens + t.output_tokens))
                 FROM ai_traces t
                 WHERE t.agent_run_id = r.id AND t.project_id = r.project_id
             ), r.total_tokens),
@@ -37,7 +37,7 @@ CREATE TRIGGER ai_traces_sync_run_totals
 UPDATE agent_runs r SET
     total_tokens = coalesce((
         SELECT sum(coalesce(t.total_tokens,
-                            coalesce(t.input_tokens, 0) + coalesce(t.output_tokens, 0)))
+                            t.input_tokens + t.output_tokens))
         FROM ai_traces t
         WHERE t.agent_run_id = r.id AND t.project_id = r.project_id
     ), r.total_tokens),
