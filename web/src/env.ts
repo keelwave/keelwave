@@ -7,7 +7,11 @@ export const env = createEnv({
   clientPrefix: "VITE_",
 
   client: {
-    VITE_KEELWAVE_API_URL: z.url(),
+    // Optional. When the dashboard is served same-origin by the keelwave
+    // binary (single-image deploy), leave this unset and the API client
+    // uses relative paths against the current origin. Set it only when the
+    // dashboard and API live on different origins (e.g. local `vite dev`).
+    VITE_KEELWAVE_API_URL: z.url().optional(),
     VITE_KEELWAVE_API_KEY: z.string().optional(),
   },
 

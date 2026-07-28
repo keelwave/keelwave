@@ -19,7 +19,7 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 })
 
-const API_BASE = env.VITE_KEELWAVE_API_URL.replace(/\/$/, "")
+const API_BASE = (env.VITE_KEELWAVE_API_URL ?? "").replace(/\/$/, "")
 
 function oauthUrl(provider: string, redirect?: string) {
   const base = `${API_BASE}/v1/auth/oauth/${provider}/start`

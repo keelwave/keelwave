@@ -1,0 +1,6 @@
+# Built dashboard assets are produced by `pnpm build` in web/ (or the Docker
+# node stage) and are NOT committed. Only the placeholder index.html below is
+# tracked so `go build` works on a fresh checkout before any web build.
+*
+!.gitignore
+!index.html
