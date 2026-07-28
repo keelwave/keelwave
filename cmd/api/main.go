@@ -20,7 +20,7 @@ import (
 	"github.com/keelwave/keelwave/internal/store"
 )
 
-const version = "0.0.1"
+var version = "0.0.1"
 
 //	@title			Keelwave API
 //	@description	Unified observability platform for AI agents, APIs, and infrastructure.

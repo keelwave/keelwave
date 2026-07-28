@@ -1,0 +1,26 @@
+name: ci-docker
+
+on:
+  pull_request:
+    paths: ["**", "!web/**"]
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-image:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - uses: useblacksmith/setup-docker-builder@v1
+      - uses: useblacksmith/build-push-action@v1
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: keelwave:ci
+          build-args: VERSION=ci
