@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { useMemo, useState } from "react"
 
+import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/empty-state"
 import { ErrorState } from "@/components/error-state"
 import { TableSkeleton } from "@/components/table-skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AlertsTable } from "@/features/alerts/components/alerts-table"
+import { RuleForm } from "@/features/alerts/components/rule-form"
 import { RulesTable } from "@/features/alerts/components/rules-table"
 import { useAlertRules, useAlerts } from "@/features/alerts/hooks/use-alerts"
 import type { AlertRule } from "@/features/alerts/types"
@@ -24,6 +26,7 @@ function AlertsPage() {
   const role = useMyOrgRole(currentOrg?.id ?? "")
   const canEdit = role === "admin" || role === "owner"
   const [editing, setEditing] = useState<AlertRule | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
 
   const ruleNames = useMemo(() => {
     const map = new Map<string, string>()
@@ -84,11 +87,17 @@ function AlertsPage() {
         </TabsContent>
 
         <TabsContent value="rules" className="space-y-4">
-          {editing ? (
-            <p className="text-muted-foreground text-sm" data-testid="editing-rule-indicator">
-              Editing <span className="font-medium">{editing.name}</span> — the
-              edit form lands in the next task.
-            </p>
+          {canEdit ? (
+            <div className="flex justify-end">
+              <Button
+                onClick={() => {
+                  setEditing(null)
+                  setFormOpen(true)
+                }}
+              >
+                New rule
+              </Button>
+            </div>
           ) : null}
           {rules.isPending ? (
             <TableSkeleton />
@@ -100,7 +109,10 @@ function AlertsPage() {
               projectId={currentProjectId}
               rules={rules.data}
               canEdit={canEdit}
-              onEdit={setEditing}
+              onEdit={(rule) => {
+                setEditing(rule)
+                setFormOpen(true)
+              }}
             />
           ) : (
             <EmptyState
@@ -114,6 +126,14 @@ function AlertsPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <RuleForm
+        orgId={currentOrg?.id ?? null}
+        projectId={currentProjectId}
+        editing={editing}
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+      />
     </div>
   )
 }
