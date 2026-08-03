@@ -9,8 +9,10 @@ export type AlertSignal =
   | "duration_p95"
   | "eval_regression"
 
+export type AlertDeliveryStatus = "pending" | "processing" | "done" | "dead"
+
 export interface AlertDelivery {
-  status: string
+  status: AlertDeliveryStatus
   attempts: number
   last_error?: string
 }
