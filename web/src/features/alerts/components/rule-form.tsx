@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,14 +15,16 @@ import {
   useUpdateAlertRule,
 } from "@/features/alerts/hooks/use-alerts"
 import {
+  comparatorOptions,
   draftClass,
   draftFromRule,
   emptyDraft,
+  naturalComparator,
   toPreviewInput,
   toRuleInput,
 } from "@/features/alerts/rule-form-state"
 import type { RuleDraft } from "@/features/alerts/rule-form-state"
-import type { AlertRule, AlertSignal } from "@/features/alerts/types"
+import type { AlertRule, AlertRulePreviewResult, AlertSignal } from "@/features/alerts/types"
 
 /**
  * The UI kit has no label or switch primitive (see components/ui/), so this
@@ -67,6 +69,8 @@ export function RuleForm({
 }) {
   const [draft, setDraft] = useState<RuleDraft>(emptyDraft)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [previewResult, setPreviewResult] = useState<AlertRulePreviewResult | null>(null)
+  const [previewPending, setPreviewPending] = useState(false)
 
   const create = useCreateAlertRule(orgId, projectId)
   const update = useUpdateAlertRule(orgId, projectId)
@@ -74,15 +78,41 @@ export function RuleForm({
 
   useEffect(() => {
     setDraft(editing ? draftFromRule(editing) : emptyDraft())
+    setPreviewResult(null)
+    setPreviewPending(false)
   }, [editing, open])
 
   const isAggregate = draftClass(draft) === "aggregate"
 
+  // Every dispatched preview request carries the sequence number current at
+  // dispatch time. If a newer request has since been dispatched by the time a
+  // response lands, the response is stale (edited-past) and gets dropped
+  // instead of rendering a verdict for values no longer on screen.
+  const previewSeq = useRef(0)
+
   // Debounced preview: only aggregate drafts have a metric to evaluate.
   useEffect(() => {
     const input = toPreviewInput(draft)
-    if (!input) return
-    const timer = setTimeout(() => preview.mutate(input), 400)
+    if (!input) {
+      setPreviewResult(null)
+      setPreviewPending(false)
+      return
+    }
+    setPreviewPending(true)
+    const timer = setTimeout(() => {
+      const seq = ++previewSeq.current
+      preview.mutate(input, {
+        onSuccess: (result) => {
+          if (seq !== previewSeq.current) return
+          setPreviewResult(result)
+          setPreviewPending(false)
+        },
+        onError: () => {
+          if (seq !== previewSeq.current) return
+          setPreviewPending(false)
+        },
+      })
+    }, 400)
     return () => clearTimeout(timer)
   }, [
     draft.signal,
@@ -91,10 +121,28 @@ export function RuleForm({
     draft.windowSeconds,
     draft.agentName,
     draft.evaluateOverWindow,
+    draft.minRequests,
   ])
 
   const set = <TKey extends keyof RuleDraft>(key: TKey, value: RuleDraft[TKey]) =>
     setDraft((d) => ({ ...d, [key]: value }))
+
+  // The comparator select only ever offers the current signal's valid
+  // direction (see comparatorOptions), so switching to a signal whose natural
+  // direction differs from the current comparator must reset it — otherwise
+  // Create submits a comparator the server rejects with a 400.
+  const setSignal = (signal: AlertSignal) =>
+    setDraft((d) => ({ ...d, signal, comparator: naturalComparator(signal) }))
+
+  // run_failure flips between event and aggregate class depending on this
+  // toggle; only in the aggregate case does the comparator direction matter,
+  // but resetting it either way keeps the field never stale.
+  const setEvaluateOverWindow = (evaluateOverWindow: boolean) =>
+    setDraft((d) => ({
+      ...d,
+      evaluateOverWindow,
+      comparator: naturalComparator(d.signal),
+    }))
 
   const submit = () => {
     const input = toRuleInput(draft)
@@ -105,7 +153,6 @@ export function RuleForm({
     }
   }
 
-  const previewData = preview.data
   const pending = create.isPending || update.isPending
 
   return (
@@ -134,7 +181,7 @@ export function RuleForm({
             id="rule-signal"
             className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
             value={draft.signal}
-            onChange={(e) => set("signal", e.target.value as AlertSignal)}
+            onChange={(e) => setSignal(e.target.value as AlertSignal)}
           >
             {SIGNALS.map((s) => (
               <option key={s.value} value={s.value}>
@@ -153,9 +200,7 @@ export function RuleForm({
             <Button
               variant={draft.evaluateOverWindow ? "outline" : "ghost"}
               size="sm"
-              onClick={() =>
-                set("evaluateOverWindow", !draft.evaluateOverWindow)
-              }
+              onClick={() => setEvaluateOverWindow(!draft.evaluateOverWindow)}
             >
               {draft.evaluateOverWindow ? "Windowed" : "Per run"}
             </Button>
@@ -182,7 +227,7 @@ export function RuleForm({
                 value={draft.comparator}
                 onChange={(e) => set("comparator", e.target.value)}
               >
-                {[">", ">=", "<", "<="].map((c) => (
+                {comparatorOptions(draft.signal).map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
@@ -203,6 +248,7 @@ export function RuleForm({
               <Input
                 id="rule-window"
                 type="number"
+                min={1}
                 value={draft.windowSeconds}
                 onChange={(e) => set("windowSeconds", Number(e.target.value))}
               />
@@ -210,18 +256,22 @@ export function RuleForm({
           </div>
         ) : null}
 
-        {isAggregate && previewData ? (
-          <div className="bg-muted/50 rounded-md border p-3 text-sm">
-            {previewData.sample_count < draft.minRequests ? (
+        {isAggregate && previewResult ? (
+          <div
+            className={`bg-muted/50 rounded-md border p-3 text-sm ${
+              previewPending ? "opacity-50" : ""
+            }`}
+          >
+            {previewResult.sample_count < draft.minRequests ? (
               <span className="text-muted-foreground">
-                Not enough data to evaluate ({previewData.sample_count} samples,
+                Not enough data to evaluate ({previewResult.sample_count} samples,
                 rule needs {draft.minRequests}).
               </span>
             ) : (
               <span>
-                Right now: <strong>{previewData.value.toFixed(2)}</strong> over{" "}
-                {previewData.sample_count} samples —{" "}
-                {previewData.would_breach ? (
+                Right now: <strong>{previewResult.value.toFixed(2)}</strong> over{" "}
+                {previewResult.sample_count} samples —{" "}
+                {previewResult.would_breach ? (
                   <strong className="text-destructive">would breach</strong>
                 ) : (
                   <>below your threshold</>
@@ -229,6 +279,9 @@ export function RuleForm({
                 .
               </span>
             )}
+            {previewPending ? (
+              <p className="text-muted-foreground mt-1 text-xs">Updating…</p>
+            ) : null}
           </div>
         ) : null}
 

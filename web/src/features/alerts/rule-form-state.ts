@@ -42,6 +42,28 @@ export function emptyDraft(): RuleDraft {
   }
 }
 
+/**
+ * Mirrors cmd/api/alerts.go lowerIsBad: run_failure and eval_regression are
+ * "bad when the metric falls" (completion rate, correctness), so their only
+ * valid comparator direction is < / <=. Every other aggregate signal is
+ * higher-is-bad (cost, failure share, latency) and only accepts > / >=.
+ * validAggregateComparator on the server rejects the wrong direction with a
+ * 400, so the form must never construct one.
+ */
+export function lowerIsBad(signal: AlertSignal): boolean {
+  return signal === "run_failure" || signal === "eval_regression"
+}
+
+/** The signal's natural comparator direction — mirrors naturalComparator in alerts.go. */
+export function naturalComparator(signal: AlertSignal): string {
+  return lowerIsBad(signal) ? "<" : ">"
+}
+
+/** The only comparator values validAggregateComparator accepts for this signal. */
+export function comparatorOptions(signal: AlertSignal): string[] {
+  return lowerIsBad(signal) ? ["<", "<="] : [">", ">="]
+}
+
 export function draftFromRule(rule: AlertRule): RuleDraft {
   return {
     name: rule.name,
@@ -79,13 +101,25 @@ export function draftClass(draft: RuleDraft): "event" | "aggregate" {
   return classForSignal(draft.signal, draft.evaluateOverWindow)
 }
 
+/**
+ * The server tags window_seconds `omitempty,gt=0` on both the rule and preview
+ * payloads: a non-positive or non-finite (NaN serializes to null, which still
+ * passes omitempty) window must never be sent. Treat it as "use the server's
+ * default" by omitting the field entirely rather than clamping to 1 — clamping
+ * would silently save a materially different window than what the user saw.
+ */
+function positiveWindowOrUndefined(windowSeconds: number): number | undefined {
+  return Number.isFinite(windowSeconds) && windowSeconds > 0 ? windowSeconds : undefined
+}
+
 export function toRuleInput(draft: RuleDraft): AlertRuleInput {
   const cls = draftClass(draft)
+  const threshold = cls === "aggregate" && Number.isFinite(draft.threshold) ? draft.threshold : 0
   const input: AlertRuleInput = {
     name: draft.name,
     class: cls,
     signal: draft.signal,
-    threshold: cls === "aggregate" ? draft.threshold : 0,
+    threshold,
     severity: draft.severity,
     channel: "email",
     channel_config: { to: draft.recipient },
@@ -98,22 +132,31 @@ export function toRuleInput(draft: RuleDraft): AlertRuleInput {
   if (draft.agentName.trim()) input.agent_name = draft.agentName.trim()
   if (cls === "aggregate") {
     input.comparator = draft.comparator
-    input.window_seconds = draft.windowSeconds
+    const window = positiveWindowOrUndefined(draft.windowSeconds)
+    if (window !== undefined) input.window_seconds = window
   }
   return input
 }
 
-/** Null when the draft has no metric to evaluate — event rules have no threshold. */
+/**
+ * Null when the draft has no metric to evaluate — event rules have no
+ * threshold — or when threshold/window are non-finite: a NaN threshold or
+ * window is a mid-edit draft (e.g. an emptied number input), not something
+ * worth round-tripping to the preview endpoint.
+ */
 export function toPreviewInput(draft: RuleDraft): AlertRulePreviewInput | null {
   if (draftClass(draft) !== "aggregate") return null
   if (!isAggregateSignal(draft.signal)) return null
+  if (!Number.isFinite(draft.threshold)) return null
+  if (!Number.isFinite(draft.windowSeconds)) return null
   const input: AlertRulePreviewInput = {
     signal: draft.signal,
     comparator: draft.comparator,
     threshold: draft.threshold,
-    window_seconds: draft.windowSeconds,
     min_requests: draft.minRequests,
   }
+  const window = positiveWindowOrUndefined(draft.windowSeconds)
+  if (window !== undefined) input.window_seconds = window
   if (draft.agentName.trim()) input.agent_name = draft.agentName.trim()
   return input
 }
