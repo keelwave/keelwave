@@ -131,15 +131,16 @@ func (app *application) upsertTool(projectID uuid.UUID, toolName string) {
 //	@Summary	List steps for an agent run, ordered by step_index asc
 //	@Tags		agent
 //	@Produce	json
-//	@Param		runID	path		string	true	"Agent run UUID"
-//	@Param		at		query		string	false	"RFC3339 hint for chunk pruning"
-//	@Param		limit	query		int		false	"default 1000, max 1000"
-//	@Success	200		{array}		store.AgentStep
-//	@Failure	400		{object}	error
-//	@Failure	401		{object}	error
-//	@Failure	500		{object}	error
+//	@Param		projectID	path		string	true	"Project UUID"
+//	@Param		runID		path		string	true	"Agent run UUID"
+//	@Param		at			query		string	false	"RFC3339 hint for chunk pruning"
+//	@Param		limit		query		int		false	"default 1000, max 1000"
+//	@Success	200			{array}		store.AgentStep
+//	@Failure	400			{object}	error
+//	@Failure	401			{object}	error
+//	@Failure	500			{object}	error
 //	@Security	ApiKeyAuth
-//	@Router		/agent/runs/{runID}/steps [get]
+//	@Router		/projects/{projectID}/agent/runs/{runID}/steps [get]
 func (app *application) listAgentStepsHandler(w http.ResponseWriter, r *http.Request) {
 	projectID := projectIDFromContext(r.Context())
 	runID, err := parseUUIDParam(r, "runID")
@@ -173,14 +174,15 @@ func (app *application) listAgentStepsHandler(w http.ResponseWriter, r *http.Req
 //	@Description	Returns each tool_name + input fingerprint repeated >= 2 times.
 //	@Tags			agent
 //	@Produce		json
-//	@Param			runID	path		string	true	"Agent run UUID"
-//	@Param			at		query		string	false	"RFC3339 hint for chunk pruning"
-//	@Success		200		{array}		store.LoopHit
-//	@Failure		400		{object}	error
-//	@Failure		401		{object}	error
-//	@Failure		500		{object}	error
+//	@Param			projectID	path		string	true	"Project UUID"
+//	@Param			runID		path		string	true	"Agent run UUID"
+//	@Param			at			query		string	false	"RFC3339 hint for chunk pruning"
+//	@Success		200			{array}		store.LoopHit
+//	@Failure		400			{object}	error
+//	@Failure		401			{object}	error
+//	@Failure		500			{object}	error
 //	@Security		ApiKeyAuth
-//	@Router			/agent/runs/{runID}/loops [get]
+//	@Router			/projects/{projectID}/agent/runs/{runID}/loops [get]
 func (app *application) listAgentLoopsHandler(w http.ResponseWriter, r *http.Request) {
 	projectID := projectIDFromContext(r.Context())
 	runID, err := parseUUIDParam(r, "runID")
@@ -208,11 +210,12 @@ func (app *application) listAgentLoopsHandler(w http.ResponseWriter, r *http.Req
 //	@Summary	Step counts grouped by step_type
 //	@Tags		agent
 //	@Produce	json
-//	@Param		from	query	string	false	"RFC3339, default now - 30d"
-//	@Param		to		query	string	false	"RFC3339, default now"
-//	@Success	200		{array}	store.StepTypeCount
+//	@Param		projectID	path	string	true	"Project UUID"
+//	@Param		from		query	string	false	"RFC3339, default now - 30d"
+//	@Param		to			query	string	false	"RFC3339, default now"
+//	@Success	200			{array}	store.StepTypeCount
 //	@Security	ApiKeyAuth
-//	@Router		/agent/steps/distribution [get]
+//	@Router		/projects/{projectID}/agent/steps/distribution [get]
 func (app *application) stepDistributionHandler(w http.ResponseWriter, r *http.Request) {
 	projectID := projectIDFromContext(r.Context())
 	params, err := parseListParams(r)
@@ -236,14 +239,15 @@ func (app *application) stepDistributionHandler(w http.ResponseWriter, r *http.R
 //	@Description	Aggregates tool calls across every run in the window: call count, success/fail counts, success rate, and p95 latency per tool.
 //	@Tags			agent
 //	@Produce		json
-//	@Param			from	query		string	false	"RFC3339, default now - 30d"
-//	@Param			to		query		string	false	"RFC3339, default now"
-//	@Success		200		{array}		store.ToolStat
-//	@Failure		400		{object}	error
-//	@Failure		401		{object}	error
-//	@Failure		500		{object}	error
+//	@Param			projectID	path		string	true	"Project UUID"
+//	@Param			from		query		string	false	"RFC3339, default now - 30d"
+//	@Param			to			query		string	false	"RFC3339, default now"
+//	@Success		200			{array}		store.ToolStat
+//	@Failure		400			{object}	error
+//	@Failure		401			{object}	error
+//	@Failure		500			{object}	error
 //	@Security		ApiKeyAuth
-//	@Router			/agent/tools/stats [get]
+//	@Router			/projects/{projectID}/agent/tools/stats [get]
 func (app *application) toolStatsHandler(w http.ResponseWriter, r *http.Request) {
 	projectID := projectIDFromContext(r.Context())
 	params, err := parseListParams(r)

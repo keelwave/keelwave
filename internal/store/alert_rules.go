@@ -27,7 +27,7 @@ type AlertRule struct {
 	CooldownSeconds      int             `json:"cooldown_seconds"`
 	MinRequests          int             `json:"min_requests"`
 	Channel              string          `json:"channel"`
-	ChannelConfig        json.RawMessage `json:"channel_config"`
+	ChannelConfig        json.RawMessage `json:"channel_config" swaggertype:"object"`
 	Enabled              bool            `json:"enabled"`
 	CreatedAt            time.Time       `json:"created_at"`
 }

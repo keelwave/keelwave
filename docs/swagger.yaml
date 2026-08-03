@@ -1,5 +1,67 @@
 basePath: /v1
 definitions:
+  main.alertRulePayload:
+    properties:
+      agent_name:
+        type: string
+      channel:
+        enum:
+        - email
+        type: string
+      channel_config:
+        type: object
+      class:
+        enum:
+        - event
+        - aggregate
+        type: string
+      comparator:
+        type: string
+      cooldown_seconds:
+        minimum: 0
+        type: integer
+      enabled:
+        type: boolean
+      for_seconds:
+        minimum: 0
+        type: integer
+      keep_firing_for_seconds:
+        minimum: 0
+        type: integer
+      min_requests:
+        minimum: 0
+        type: integer
+      name:
+        maxLength: 200
+        type: string
+      severity:
+        enum:
+        - page
+        - warn
+        - digest
+        type: string
+      signal:
+        enum:
+        - run_failure
+        - loop
+        - termination_shift
+        - cost_burn
+        - tool_failure
+        - duration_p95
+        - eval_regression
+        type: string
+      threshold:
+        minimum: 0
+        type: number
+      window_seconds:
+        type: integer
+    required:
+    - channel
+    - class
+    - name
+    - severity
+    - signal
+    type: object
   main.authUserResponse:
     properties:
       organizations:
@@ -416,6 +478,45 @@ definitions:
         type: array
       tool_success:
         type: boolean
+    type: object
+  store.AlertRule:
+    properties:
+      agent_name:
+        type: string
+      channel:
+        type: string
+      channel_config:
+        type: object
+      class:
+        type: string
+      comparator:
+        type: string
+      cooldown_seconds:
+        type: integer
+      created_at:
+        type: string
+      enabled:
+        type: boolean
+      for_seconds:
+        type: integer
+      id:
+        type: string
+      keep_firing_for_seconds:
+        type: integer
+      min_requests:
+        type: integer
+      name:
+        type: string
+      project_id:
+        type: string
+      severity:
+        type: string
+      signal:
+        type: string
+      threshold:
+        type: number
+      window_seconds:
+        type: integer
     type: object
   store.LoopHit:
     properties:
@@ -972,6 +1073,161 @@ paths:
       summary: Fetches a project
       tags:
       - admin/projects
+  /admin/orgs/{orgID}/projects/{projectID}/alert-rules:
+    get:
+      parameters:
+      - description: Organization UUID
+        in: path
+        name: orgID
+        required: true
+        type: string
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/store.AlertRule'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Lists alert rules for a project
+      tags:
+      - admin/alert-rules
+    post:
+      consumes:
+      - application/json
+      description: Defines a threshold alert on an agent signal, scoped to the project.
+        Requires admin role.
+      parameters:
+      - description: Organization UUID
+        in: path
+        name: orgID
+        required: true
+        type: string
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: Alert rule payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.alertRulePayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/store.AlertRule'
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Creates an alert rule
+      tags:
+      - admin/alert-rules
+  /admin/orgs/{orgID}/projects/{projectID}/alert-rules/{ruleID}:
+    delete:
+      description: Removes an alert rule and cascades to its alert_events. Requires
+        admin role.
+      parameters:
+      - description: Organization UUID
+        in: path
+        name: orgID
+        required: true
+        type: string
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: Alert rule UUID
+        in: path
+        name: ruleID
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Deletes an alert rule
+      tags:
+      - admin/alert-rules
+    patch:
+      consumes:
+      - application/json
+      description: Replaces the mutable fields of an alert rule. Requires admin role.
+      parameters:
+      - description: Organization UUID
+        in: path
+        name: orgID
+        required: true
+        type: string
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: Alert rule UUID
+        in: path
+        name: ruleID
+        required: true
+        type: string
+      - description: Alert rule payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.alertRulePayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/store.AlertRule'
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Updates an alert rule
+      tags:
+      - admin/alert-rules
   /admin/orgs/{orgID}/projects/{projectID}/keys:
     get:
       parameters:
@@ -1082,348 +1338,6 @@ paths:
       summary: Deletes an API key
       tags:
       - admin/keys
-  /agent/health:
-    get:
-      description: 'Rolls up run outcomes per agent_name: total runs, completion rate,
-        loop rate, avg cost, and avg tokens over the window.'
-      parameters:
-      - description: RFC3339, default now - 30d
-        in: query
-        name: from
-        type: string
-      - description: RFC3339, default now
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/store.RunHealthRow'
-            type: array
-        "400":
-          description: Bad Request
-          schema: {}
-        "401":
-          description: Unauthorized
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: Per-agent run-health rollup for the calling project
-      tags:
-      - agent
-  /agent/runs:
-    get:
-      parameters:
-      - description: RFC3339, default now - 30d
-        in: query
-        name: from
-        type: string
-      - description: RFC3339, default now
-        in: query
-        name: to
-        type: string
-      - description: default 25, max 1000
-        in: query
-        name: limit
-        type: integer
-      - description: default 0
-        in: query
-        name: offset
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/store.AgentRun'
-            type: array
-        "400":
-          description: Bad Request
-          schema: {}
-        "401":
-          description: Unauthorized
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: List agent runs for the calling project
-      tags:
-      - agent
-  /agent/runs/{runID}:
-    get:
-      parameters:
-      - description: Agent run UUID
-        in: path
-        name: runID
-        required: true
-        type: string
-      - description: RFC3339; if set, lookup is bounded to a 2s window for fast chunk
-          pruning
-        in: query
-        name: at
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/store.AgentRun'
-        "400":
-          description: Bad Request
-          schema: {}
-        "401":
-          description: Unauthorized
-          schema: {}
-        "404":
-          description: Not Found
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: Fetch a single agent run by id
-      tags:
-      - agent
-  /agent/runs/{runID}/loops:
-    get:
-      description: Returns each tool_name + input fingerprint repeated >= 2 times.
-      parameters:
-      - description: Agent run UUID
-        in: path
-        name: runID
-        required: true
-        type: string
-      - description: RFC3339 hint for chunk pruning
-        in: query
-        name: at
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/store.LoopHit'
-            type: array
-        "400":
-          description: Bad Request
-          schema: {}
-        "401":
-          description: Unauthorized
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: Loop detection for an agent run
-      tags:
-      - agent
-  /agent/runs/{runID}/steps:
-    get:
-      parameters:
-      - description: Agent run UUID
-        in: path
-        name: runID
-        required: true
-        type: string
-      - description: RFC3339 hint for chunk pruning
-        in: query
-        name: at
-        type: string
-      - description: default 1000, max 1000
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/store.AgentStep'
-            type: array
-        "400":
-          description: Bad Request
-          schema: {}
-        "401":
-          description: Unauthorized
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: List steps for an agent run, ordered by step_index asc
-      tags:
-      - agent
-  /agent/runs/terminations:
-    get:
-      parameters:
-      - description: RFC3339, default now - 30d
-        in: query
-        name: from
-        type: string
-      - description: RFC3339, default now
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/store.TerminationCount'
-            type: array
-      security:
-      - ApiKeyAuth: []
-      summary: Run counts grouped by termination reason
-      tags:
-      - agent
-  /agent/runs/timeseries:
-    get:
-      description: Returns per-bucket run outcome counts (total, completed, failed,
-        loop) via TimescaleDB time_bucket. bucket is one of 1h, 6h, 1d.
-      parameters:
-      - description: RFC3339, default now - 30d
-        in: query
-        name: from
-        type: string
-      - description: RFC3339, default now
-        in: query
-        name: to
-        type: string
-      - description: 'bucket size: 1h (default), 6h, 1d'
-        in: query
-        name: bucket
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/store.RunBucket'
-            type: array
-        "400":
-          description: Bad Request
-          schema: {}
-        "401":
-          description: Unauthorized
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: Bucketed run counts over time for the calling project
-      tags:
-      - agent
-  /agent/steps/distribution:
-    get:
-      parameters:
-      - description: RFC3339, default now - 30d
-        in: query
-        name: from
-        type: string
-      - description: RFC3339, default now
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/store.StepTypeCount'
-            type: array
-      security:
-      - ApiKeyAuth: []
-      summary: Step counts grouped by step_type
-      tags:
-      - agent
-  /agent/summary:
-    get:
-      parameters:
-      - description: RFC3339, default now - 30d
-        in: query
-        name: from
-        type: string
-      - description: RFC3339, default now
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              $ref: '#/definitions/store.RunSummary'
-            type: object
-      security:
-      - ApiKeyAuth: []
-      summary: Run summary + duration percentiles for the calling project, current
-        vs previous window
-      tags:
-      - agent
-  /agent/tools/stats:
-    get:
-      description: 'Aggregates tool calls across every run in the window: call count,
-        success/fail counts, success rate, and p95 latency per tool.'
-      parameters:
-      - description: RFC3339, default now - 30d
-        in: query
-        name: from
-        type: string
-      - description: RFC3339, default now
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/store.ToolStat'
-            type: array
-        "400":
-          description: Bad Request
-          schema: {}
-        "401":
-          description: Unauthorized
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: Per-tool usage analytics for the calling project
-      tags:
-      - agent
   /auth/invites/{token}:
     get:
       parameters:
@@ -1844,6 +1758,398 @@ paths:
       summary: Ingest a host metric
       tags:
       - ingest
+  /projects/{projectID}/agent/health:
+    get:
+      description: 'Rolls up run outcomes per agent_name: total runs, completion rate,
+        loop rate, avg cost, and avg tokens over the window.'
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: RFC3339, default now - 30d
+        in: query
+        name: from
+        type: string
+      - description: RFC3339, default now
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/store.RunHealthRow'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Per-agent run-health rollup for the calling project
+      tags:
+      - agent
+  /projects/{projectID}/agent/runs:
+    get:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: RFC3339, default now - 30d
+        in: query
+        name: from
+        type: string
+      - description: RFC3339, default now
+        in: query
+        name: to
+        type: string
+      - description: default 25, max 1000
+        in: query
+        name: limit
+        type: integer
+      - description: default 0
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/store.AgentRun'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List agent runs for the calling project
+      tags:
+      - agent
+  /projects/{projectID}/agent/runs/{runID}:
+    get:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: Agent run UUID
+        in: path
+        name: runID
+        required: true
+        type: string
+      - description: RFC3339; if set, lookup is bounded to a 2s window for fast chunk
+          pruning
+        in: query
+        name: at
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/store.AgentRun'
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Fetch a single agent run by id
+      tags:
+      - agent
+  /projects/{projectID}/agent/runs/{runID}/loops:
+    get:
+      description: Returns each tool_name + input fingerprint repeated >= 2 times.
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: Agent run UUID
+        in: path
+        name: runID
+        required: true
+        type: string
+      - description: RFC3339 hint for chunk pruning
+        in: query
+        name: at
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/store.LoopHit'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Loop detection for an agent run
+      tags:
+      - agent
+  /projects/{projectID}/agent/runs/{runID}/steps:
+    get:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: Agent run UUID
+        in: path
+        name: runID
+        required: true
+        type: string
+      - description: RFC3339 hint for chunk pruning
+        in: query
+        name: at
+        type: string
+      - description: default 1000, max 1000
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/store.AgentStep'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List steps for an agent run, ordered by step_index asc
+      tags:
+      - agent
+  /projects/{projectID}/agent/runs/terminations:
+    get:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: RFC3339, default now - 30d
+        in: query
+        name: from
+        type: string
+      - description: RFC3339, default now
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/store.TerminationCount'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: Run counts grouped by termination reason
+      tags:
+      - agent
+  /projects/{projectID}/agent/runs/timeseries:
+    get:
+      description: Returns per-bucket run outcome counts (total, completed, failed,
+        loop) via TimescaleDB time_bucket. bucket is one of 1h, 6h, 1d.
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: RFC3339, default now - 30d
+        in: query
+        name: from
+        type: string
+      - description: RFC3339, default now
+        in: query
+        name: to
+        type: string
+      - description: 'bucket size: 1h (default), 6h, 1d'
+        in: query
+        name: bucket
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/store.RunBucket'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Bucketed run counts over time for the calling project
+      tags:
+      - agent
+  /projects/{projectID}/agent/steps/distribution:
+    get:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: RFC3339, default now - 30d
+        in: query
+        name: from
+        type: string
+      - description: RFC3339, default now
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/store.StepTypeCount'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: Step counts grouped by step_type
+      tags:
+      - agent
+  /projects/{projectID}/agent/summary:
+    get:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: RFC3339, default now - 30d
+        in: query
+        name: from
+        type: string
+      - description: RFC3339, default now
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/store.RunSummary'
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Run summary + duration percentiles for the calling project, current
+        vs previous window
+      tags:
+      - agent
+  /projects/{projectID}/agent/tools/stats:
+    get:
+      description: 'Aggregates tool calls across every run in the window: call count,
+        success/fail counts, success rate, and p95 latency per tool.'
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: RFC3339, default now - 30d
+        in: query
+        name: from
+        type: string
+      - description: RFC3339, default now
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/store.ToolStat'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Per-tool usage analytics for the calling project
+      tags:
+      - agent
 securityDefinitions:
   ApiKeyAuth:
     description: 'Format: "Bearer kw_<token>"'

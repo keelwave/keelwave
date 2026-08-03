@@ -178,16 +178,17 @@ func (app *application) ingestAgentRunFinishHandler(w http.ResponseWriter, r *ht
 //	@Summary	List agent runs for the calling project
 //	@Tags		agent
 //	@Produce	json
-//	@Param		from	query		string	false	"RFC3339, default now - 30d"
-//	@Param		to		query		string	false	"RFC3339, default now"
-//	@Param		limit	query		int		false	"default 25, max 1000"
-//	@Param		offset	query		int		false	"default 0"
-//	@Success	200		{array}		store.AgentRun
-//	@Failure	400		{object}	error
-//	@Failure	401		{object}	error
-//	@Failure	500		{object}	error
+//	@Param		projectID	path		string	true	"Project UUID"
+//	@Param		from		query		string	false	"RFC3339, default now - 30d"
+//	@Param		to			query		string	false	"RFC3339, default now"
+//	@Param		limit		query		int		false	"default 25, max 1000"
+//	@Param		offset		query		int		false	"default 0"
+//	@Success	200			{array}		store.AgentRun
+//	@Failure	400			{object}	error
+//	@Failure	401			{object}	error
+//	@Failure	500			{object}	error
 //	@Security	ApiKeyAuth
-//	@Router		/agent/runs [get]
+//	@Router		/projects/{projectID}/agent/runs [get]
 func (app *application) listAgentRunsHandler(w http.ResponseWriter, r *http.Request) {
 	projectID := projectIDFromContext(r.Context())
 	params, err := parseListParams(r)
@@ -210,15 +211,16 @@ func (app *application) listAgentRunsHandler(w http.ResponseWriter, r *http.Requ
 //	@Summary	Fetch a single agent run by id
 //	@Tags		agent
 //	@Produce	json
-//	@Param		runID	path		string	true	"Agent run UUID"
-//	@Param		at		query		string	false	"RFC3339; if set, lookup is bounded to a 2s window for fast chunk pruning"
-//	@Success	200		{object}	store.AgentRun
-//	@Failure	400		{object}	error
-//	@Failure	401		{object}	error
-//	@Failure	404		{object}	error
-//	@Failure	500		{object}	error
+//	@Param		projectID	path		string	true	"Project UUID"
+//	@Param		runID		path		string	true	"Agent run UUID"
+//	@Param		at			query		string	false	"RFC3339; if set, lookup is bounded to a 2s window for fast chunk pruning"
+//	@Success	200			{object}	store.AgentRun
+//	@Failure	400			{object}	error
+//	@Failure	401			{object}	error
+//	@Failure	404			{object}	error
+//	@Failure	500			{object}	error
 //	@Security	ApiKeyAuth
-//	@Router		/agent/runs/{runID} [get]
+//	@Router		/projects/{projectID}/agent/runs/{runID} [get]
 func (app *application) getAgentRunHandler(w http.ResponseWriter, r *http.Request) {
 	projectID := projectIDFromContext(r.Context())
 	runID, err := parseUUIDParam(r, "runID")
@@ -252,14 +254,15 @@ func (app *application) getAgentRunHandler(w http.ResponseWriter, r *http.Reques
 //	@Description	Rolls up run outcomes per agent_name: total runs, completion rate, loop rate, avg cost, and avg tokens over the window.
 //	@Tags			agent
 //	@Produce		json
-//	@Param			from	query		string	false	"RFC3339, default now - 30d"
-//	@Param			to		query		string	false	"RFC3339, default now"
-//	@Success		200		{array}		store.RunHealthRow
-//	@Failure		400		{object}	error
-//	@Failure		401		{object}	error
-//	@Failure		500		{object}	error
+//	@Param			projectID	path		string	true	"Project UUID"
+//	@Param			from		query		string	false	"RFC3339, default now - 30d"
+//	@Param			to			query		string	false	"RFC3339, default now"
+//	@Success		200			{array}		store.RunHealthRow
+//	@Failure		400			{object}	error
+//	@Failure		401			{object}	error
+//	@Failure		500			{object}	error
 //	@Security		ApiKeyAuth
-//	@Router			/agent/health [get]
+//	@Router			/projects/{projectID}/agent/health [get]
 func (app *application) runHealthHandler(w http.ResponseWriter, r *http.Request) {
 	projectID := projectIDFromContext(r.Context())
 	params, err := parseListParams(r)
@@ -283,11 +286,12 @@ func (app *application) runHealthHandler(w http.ResponseWriter, r *http.Request)
 //	@Summary	Run summary + duration percentiles for the calling project, current vs previous window
 //	@Tags		agent
 //	@Produce	json
-//	@Param		from	query		string	false	"RFC3339, default now - 30d"
-//	@Param		to		query		string	false	"RFC3339, default now"
-//	@Success	200		{object}	map[string]store.RunSummary
+//	@Param		projectID	path		string	true	"Project UUID"
+//	@Param		from		query		string	false	"RFC3339, default now - 30d"
+//	@Param		to			query		string	false	"RFC3339, default now"
+//	@Success	200			{object}	map[string]store.RunSummary
 //	@Security	ApiKeyAuth
-//	@Router		/agent/summary [get]
+//	@Router		/projects/{projectID}/agent/summary [get]
 func (app *application) summaryHandler(w http.ResponseWriter, r *http.Request) {
 	projectID := projectIDFromContext(r.Context())
 	params, err := parseListParams(r)
@@ -327,11 +331,12 @@ func (app *application) summaryHandler(w http.ResponseWriter, r *http.Request) {
 //	@Summary	Run counts grouped by termination reason
 //	@Tags		agent
 //	@Produce	json
-//	@Param		from	query	string	false	"RFC3339, default now - 30d"
-//	@Param		to		query	string	false	"RFC3339, default now"
-//	@Success	200		{array}	store.TerminationCount
+//	@Param		projectID	path	string	true	"Project UUID"
+//	@Param		from		query	string	false	"RFC3339, default now - 30d"
+//	@Param		to			query	string	false	"RFC3339, default now"
+//	@Success	200			{array}	store.TerminationCount
 //	@Security	ApiKeyAuth
-//	@Router		/agent/runs/terminations [get]
+//	@Router		/projects/{projectID}/agent/runs/terminations [get]
 func (app *application) terminationsHandler(w http.ResponseWriter, r *http.Request) {
 	projectID := projectIDFromContext(r.Context())
 	params, err := parseListParams(r)
@@ -361,15 +366,16 @@ var bucketIntervals = map[string]string{
 //	@Description	Returns per-bucket run outcome counts (total, completed, failed, loop) via TimescaleDB time_bucket. bucket is one of 1h, 6h, 1d.
 //	@Tags			agent
 //	@Produce		json
-//	@Param			from	query		string	false	"RFC3339, default now - 30d"
-//	@Param			to		query		string	false	"RFC3339, default now"
-//	@Param			bucket	query		string	false	"bucket size: 1h (default), 6h, 1d"
-//	@Success		200		{array}		store.RunBucket
-//	@Failure		400		{object}	error
-//	@Failure		401		{object}	error
-//	@Failure		500		{object}	error
+//	@Param			projectID	path		string	true	"Project UUID"
+//	@Param			from		query		string	false	"RFC3339, default now - 30d"
+//	@Param			to			query		string	false	"RFC3339, default now"
+//	@Param			bucket		query		string	false	"bucket size: 1h (default), 6h, 1d"
+//	@Success		200			{array}		store.RunBucket
+//	@Failure		400			{object}	error
+//	@Failure		401			{object}	error
+//	@Failure		500			{object}	error
 //	@Security		ApiKeyAuth
-//	@Router			/agent/runs/timeseries [get]
+//	@Router			/projects/{projectID}/agent/runs/timeseries [get]
 func (app *application) runsTimeseriesHandler(w http.ResponseWriter, r *http.Request) {
 	projectID := projectIDFromContext(r.Context())
 	params, err := parseListParams(r)
