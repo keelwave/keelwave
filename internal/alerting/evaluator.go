@@ -55,7 +55,7 @@ func (ev *Evaluator) EvaluateAggregate(ctx context.Context, rule *store.AlertRul
 	// run the state machine so a firing alert whose volume drops can recover rather
 	// than freeze in firing.
 	enoughVolume := rule.MinRequests == 0 || count >= rule.MinRequests
-	breached := count > 0 && enoughVolume && compare(value, rule.Comparator, rule.Threshold)
+	breached := count > 0 && enoughVolume && Compare(value, rule.Comparator, rule.Threshold)
 	fp := Fingerprint(rule.ID, scope)
 	now := time.Now()
 
@@ -183,6 +183,14 @@ func (ev *Evaluator) persist(ctx context.Context, rule *store.AlertRule, live *s
 	})
 }
 
+// Preview evaluates an unsaved rule's metric exactly as EvaluateAggregate would,
+// without touching alert state. The dashboard uses it so a user can see what a
+// threshold means before saving. It deliberately shares queryMetric with live
+// evaluation — a second query path would drift.
+func (ev *Evaluator) Preview(ctx context.Context, rule *store.AlertRule) (float64, string, int, error) {
+	return ev.queryMetric(ctx, rule)
+}
+
 // queryMetric resolves the rule's observed value, scope_label, and window count
 // (the min_requests denominator).
 //
@@ -295,7 +303,9 @@ func (ev *Evaluator) queryMetric(ctx context.Context, rule *store.AlertRule) (fl
 	}
 }
 
-func compare(value float64, comparator string, threshold float64) bool {
+// Compare is the breach test the live evaluator uses. Exported so preview
+// endpoints can reuse it instead of forking a second comparison function.
+func Compare(value float64, comparator string, threshold float64) bool {
 	switch comparator {
 	case ">":
 		return value > threshold

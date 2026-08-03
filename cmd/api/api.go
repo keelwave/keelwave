@@ -200,6 +200,7 @@ func (app *application) mount() *chi.Mux {
 							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Post("/", app.createAlertRuleHandler)
 							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Patch("/{ruleID}", app.updateAlertRuleHandler)
 							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Delete("/{ruleID}", app.deleteAlertRuleHandler)
+							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Post("/preview", app.previewAlertRuleHandler)
 						})
 					})
 				})

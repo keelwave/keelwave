@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/keelwave/keelwave/internal/alerting"
 	"github.com/keelwave/keelwave/internal/auth"
 	"github.com/keelwave/keelwave/internal/batch"
 	"github.com/keelwave/keelwave/internal/mailer"
@@ -103,11 +104,12 @@ func newTestServer(t *testing.T) *testServer {
 				dashboardURL: "http://localhost:3000",
 			},
 		},
-		pool:     testPool,
-		store:    s,
-		batchers: batch.NewBatchers(testPool, batch.Config{}, zap.NewNop().Sugar()),
-		mailer:   noopMailer{},
-		logger:   zap.NewNop().Sugar(),
+		pool:      testPool,
+		store:     s,
+		batchers:  batch.NewBatchers(testPool, batch.Config{}, zap.NewNop().Sugar()),
+		mailer:    noopMailer{},
+		logger:    zap.NewNop().Sugar(),
+		evaluator: alerting.NewEvaluator(testPool, s, zap.NewNop().Sugar()),
 	}
 
 	srv := httptest.NewServer(app.mount())

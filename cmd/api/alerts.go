@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/mail"
 
 	"github.com/google/uuid"
 
+	"github.com/keelwave/keelwave/internal/alerting"
 	"github.com/keelwave/keelwave/internal/store"
 )
 
@@ -366,4 +368,89 @@ func (app *application) deleteAlertRuleHandler(w http.ResponseWriter, r *http.Re
 	}
 
 	app.noContentResponse(w)
+}
+
+type alertRulePreviewPayload struct {
+	AgentName     *string `json:"agent_name,omitempty" validate:"omitempty,max=200"`
+	Signal        string  `json:"signal" validate:"required,oneof=run_failure loop termination_shift cost_burn tool_failure duration_p95 eval_regression"`
+	Comparator    string  `json:"comparator" validate:"required,oneof=> >= < <="`
+	Threshold     float64 `json:"threshold"`
+	WindowSeconds *int    `json:"window_seconds,omitempty" validate:"omitempty,gt=0"`
+	MinRequests   int     `json:"min_requests" validate:"gte=0"`
+}
+
+type alertRulePreviewResult struct {
+	Value       float64 `json:"value"`
+	SampleCount int     `json:"sample_count"`
+	WouldBreach bool    `json:"would_breach"`
+	ScopeLabel  string  `json:"scope_label"`
+}
+
+// PreviewAlertRule godoc
+//
+//	@Summary		Preview an unsaved alert rule
+//	@Description	Evaluates a draft rule's signal over its window right now and reports whether the threshold would breach. Aggregate signals only.
+//	@Tags			admin/alert-rules
+//	@Accept			json
+//	@Produce		json
+//	@Param			orgID		path		string					true	"Organization UUID"
+//	@Param			projectID	path		string					true	"Project UUID"
+//	@Param			payload		body		alertRulePreviewPayload	true	"Draft rule"
+//	@Success		200			{object}	alertRulePreviewResult
+//	@Failure		400			{object}	error
+//	@Failure		401			{object}	error
+//	@Failure		403			{object}	error
+//	@Failure		404			{object}	error
+//	@Failure		500			{object}	error
+//	@Router			/admin/orgs/{orgID}/projects/{projectID}/alert-rules/preview [post]
+func (app *application) previewAlertRuleHandler(w http.ResponseWriter, r *http.Request) {
+	_, projectID, ok := app.authorizeProject(w, r)
+	if !ok {
+		return
+	}
+
+	var payload alertRulePreviewPayload
+	if err := readJSON(w, r, &payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+	if err := Validate.Struct(payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+	if payload.Signal == "loop" {
+		app.badRequestResponse(w, r, errors.New("loop is an event signal and has no metric to preview"))
+		return
+	}
+	if app.evaluator == nil {
+		app.internalServerError(w, r, errors.New("alerting evaluator not configured"))
+		return
+	}
+
+	rule := &store.AlertRule{
+		ProjectID:     projectID,
+		AgentName:     payload.AgentName,
+		Class:         "aggregate",
+		Signal:        payload.Signal,
+		Comparator:    payload.Comparator,
+		Threshold:     payload.Threshold,
+		WindowSeconds: payload.WindowSeconds,
+		MinRequests:   payload.MinRequests,
+	}
+
+	value, scope, count, err := app.evaluator.Preview(r.Context(), rule)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	result := alertRulePreviewResult{
+		Value:       value,
+		SampleCount: count,
+		WouldBreach: alerting.Compare(value, payload.Comparator, payload.Threshold),
+		ScopeLabel:  scope,
+	}
+	if err := app.jsonResponse(w, http.StatusOK, result); err != nil {
+		app.internalServerError(w, r, err)
+	}
 }

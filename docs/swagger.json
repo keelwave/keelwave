@@ -655,6 +655,74 @@
                 }
             }
         },
+        "/admin/orgs/{orgID}/projects/{projectID}/alert-rules/preview": {
+            "post": {
+                "description": "Evaluates a draft rule's signal over its window right now and reports whether the threshold would breach. Aggregate signals only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin/alert-rules"
+                ],
+                "summary": "Preview an unsaved alert rule",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Organization UUID",
+                        "name": "orgID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project UUID",
+                        "name": "projectID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Draft rule",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.alertRulePreviewPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.alertRulePreviewResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/admin/orgs/{orgID}/projects/{projectID}/alert-rules/{ruleID}": {
             "delete": {
                 "description": "Removes an alert rule and cascades to its alert_events. Requires admin role.",
@@ -2296,6 +2364,61 @@
                 },
                 "window_seconds": {
                     "type": "integer"
+                }
+            }
+        },
+        "main.alertRulePreviewPayload": {
+            "type": "object",
+            "required": [
+                "comparator",
+                "signal"
+            ],
+            "properties": {
+                "agent_name": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "comparator": {
+                    "type": "string"
+                },
+                "min_requests": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "signal": {
+                    "type": "string",
+                    "enum": [
+                        "run_failure",
+                        "loop",
+                        "termination_shift",
+                        "cost_burn",
+                        "tool_failure",
+                        "duration_p95",
+                        "eval_regression"
+                    ]
+                },
+                "threshold": {
+                    "type": "number"
+                },
+                "window_seconds": {
+                    "type": "integer"
+                }
+            }
+        },
+        "main.alertRulePreviewResult": {
+            "type": "object",
+            "properties": {
+                "sample_count": {
+                    "type": "integer"
+                },
+                "scope_label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
+                },
+                "would_breach": {
+                    "type": "boolean"
                 }
             }
         },
