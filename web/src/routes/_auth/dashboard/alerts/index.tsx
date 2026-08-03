@@ -1,13 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 
 import { EmptyState } from "@/components/empty-state"
 import { ErrorState } from "@/components/error-state"
 import { TableSkeleton } from "@/components/table-skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AlertsTable } from "@/features/alerts/components/alerts-table"
+import { RulesTable } from "@/features/alerts/components/rules-table"
 import { useAlertRules, useAlerts } from "@/features/alerts/hooks/use-alerts"
+import type { AlertRule } from "@/features/alerts/types"
 import { useAuth, useCurrentProject } from "@/features/auth/hooks/use-auth"
+import { useMyOrgRole } from "@/features/auth/hooks/use-members"
 
 export const Route = createFileRoute("/_auth/dashboard/alerts/")({
   component: AlertsPage,
@@ -18,6 +21,9 @@ function AlertsPage() {
   const { currentProjectId } = useCurrentProject()
   const alerts = useAlerts(currentProjectId)
   const rules = useAlertRules(currentOrg?.id ?? null, currentProjectId)
+  const role = useMyOrgRole(currentOrg?.id ?? "")
+  const canEdit = role === "admin" || role === "owner"
+  const [editing, setEditing] = useState<AlertRule | null>(null)
 
   const ruleNames = useMemo(() => {
     const map = new Map<string, string>()
@@ -77,8 +83,35 @@ function AlertsPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="rules">
-          <p className="text-muted-foreground text-sm">Rules land in the next task.</p>
+        <TabsContent value="rules" className="space-y-4">
+          {editing ? (
+            <p className="text-muted-foreground text-sm" data-testid="editing-rule-indicator">
+              Editing <span className="font-medium">{editing.name}</span> — the
+              edit form lands in the next task.
+            </p>
+          ) : null}
+          {rules.isPending ? (
+            <TableSkeleton />
+          ) : rules.isError ? (
+            <ErrorState message="Could not load rules." />
+          ) : rules.data.length ? (
+            <RulesTable
+              orgId={currentOrg?.id ?? null}
+              projectId={currentProjectId}
+              rules={rules.data}
+              canEdit={canEdit}
+              onEdit={setEditing}
+            />
+          ) : (
+            <EmptyState
+              title="No alert rules yet"
+              description={
+                canEdit
+                  ? "Create a rule to start getting notified."
+                  : "Ask an org admin to create one."
+              }
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>
