@@ -2158,6 +2158,67 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/projects/{projectID}/alerts/events": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Fired alert instances newest-first, each with its latest notification delivery status. state=active covers pending, firing and recovering.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "alerts"
+                ],
+                "summary": "List alerts for a project",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project UUID",
+                        "name": "projectID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "active | resolved (default: all)",
+                        "name": "state",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "default 50, max 200",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.AlertEventWithDelivery"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -2837,6 +2898,64 @@ const docTemplate = `{
                 },
                 "tool_success": {
                     "type": "boolean"
+                }
+            }
+        },
+        "store.AlertDelivery": {
+            "type": "object",
+            "properties": {
+                "attempts": {
+                    "type": "integer"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "store.AlertEventWithDelivery": {
+            "type": "object",
+            "properties": {
+                "delivery": {
+                    "$ref": "#/definitions/store.AlertDelivery"
+                },
+                "fired_at": {
+                    "type": "string"
+                },
+                "first_breached_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_evaluated_at": {
+                    "type": "string"
+                },
+                "last_fired_at": {
+                    "type": "string"
+                },
+                "last_value": {
+                    "type": "number"
+                },
+                "project_id": {
+                    "type": "string"
+                },
+                "recovering_since": {
+                    "type": "string"
+                },
+                "resolved_at": {
+                    "type": "string"
+                },
+                "rule_id": {
+                    "type": "string"
+                },
+                "scope_label": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
                 }
             }
         },
