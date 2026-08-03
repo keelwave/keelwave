@@ -1,5 +1,6 @@
 import { useNavigate, Link, useRouterState } from "@tanstack/react-router"
 import {
+  Bell,
   Bot,
   LayoutDashboard,
   ListTree,
@@ -29,6 +30,7 @@ const NAV = [
   { title: "Agents", to: "/dashboard/agents", icon: Bot },
   { title: "Agent runs", to: "/dashboard/runs", icon: ListTree },
   { title: "Tool analytics", to: "/dashboard/tools", icon: Wrench },
+  { title: "Alerts", to: "/dashboard/alerts", icon: Bell },
 ] as const
 
 const SETTINGS_NAV = [
