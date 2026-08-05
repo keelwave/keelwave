@@ -1,3 +1,16 @@
+import { useState } from "react"
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -29,6 +42,7 @@ export function RulesTable({
 }) {
   const update = useUpdateAlertRule(orgId, projectId)
   const remove = useDeleteAlertRule(orgId, projectId)
+  const [confirming, setConfirming] = useState<string | null>(null)
 
   return (
     <Table>
@@ -69,25 +83,48 @@ export function RulesTable({
               </Button>
             </TableCell>
             {canEdit ? (
-              <TableCell className="space-x-2 text-right">
-                <Button variant="ghost" size="sm" onClick={() => onEdit(rule)}>
-                  Edit
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        `Delete "${rule.name}"? Its alert history is deleted too.`
-                      )
-                    ) {
-                      remove.mutate(rule.id)
+              <TableCell>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => onEdit(rule)}>
+                    Edit
+                  </Button>
+                  <AlertDialog
+                    open={confirming === rule.id}
+                    onOpenChange={(next) =>
+                      setConfirming(next ? rule.id : null)
                     }
-                  }}
-                >
-                  Delete
-                </Button>
+                  >
+                    <AlertDialogTrigger
+                      render={<Button variant="ghost" size="sm" />}
+                    >
+                      Delete
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Delete &ldquo;{rule.name}&rdquo;?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Its alert history is deleted too. This cannot be
+                          undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          variant="destructive"
+                          disabled={remove.isPending}
+                          onClick={() => {
+                            remove.mutate(rule.id)
+                            setConfirming(null)
+                          }}
+                        >
+                          Delete rule
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </TableCell>
             ) : null}
           </TableRow>
