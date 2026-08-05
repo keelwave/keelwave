@@ -64,4 +64,22 @@ func TestAlertRulePreview_AggregateAndRejections(t *testing.T) {
 		"threshold":  1,
 	}, nil, ts.cookie)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "unknown signal rejected by validator")
+
+	// A draft the create endpoint would reject for comparator direction must not
+	// preview as valid either.
+	resp, _ = doJSON(t, http.MethodPost, alertPreviewURL(ts), "", map[string]any{
+		"signal":         "cost_burn",
+		"comparator":     "<",
+		"threshold":      5,
+		"window_seconds": 300,
+	}, nil, ts.cookie)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "cost_burn only alerts upward")
+
+	resp, _ = doJSON(t, http.MethodPost, alertPreviewURL(ts), "", map[string]any{
+		"signal":         "run_failure",
+		"comparator":     ">",
+		"threshold":      0.5,
+		"window_seconds": 300,
+	}, nil, ts.cookie)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "run_failure completion rate only alerts downward")
 }

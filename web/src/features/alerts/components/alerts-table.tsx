@@ -18,9 +18,14 @@ function formatTime(value?: string) {
 export function AlertsTable({
   alerts,
   ruleNames,
+  unknownRuleLabel = "Deleted rule",
 }: {
   alerts: Alert[]
   ruleNames: Map<string, string>
+  /** Shown when a rule_id is absent from ruleNames. Callers whose rule lookup
+   * failed pass something other than the default, so a lookup they could not
+   * complete is not reported to the user as a deletion. */
+  unknownRuleLabel?: string
 }) {
   return (
     <Table>
@@ -38,7 +43,7 @@ export function AlertsTable({
         {alerts.map((alert) => (
           <TableRow key={alert.id}>
             <TableCell className="font-medium">
-              {ruleNames.get(alert.rule_id) ?? "Deleted rule"}
+              {ruleNames.get(alert.rule_id) ?? unknownRuleLabel}
             </TableCell>
             <TableCell>{alert.scope_label || "All agents"}</TableCell>
             <TableCell>

@@ -422,6 +422,11 @@ func (app *application) previewAlertRuleHandler(w http.ResponseWriter, r *http.R
 		app.badRequestResponse(w, r, errors.New("loop is an event signal and has no metric to preview"))
 		return
 	}
+	// A draft the create endpoint would reject must not preview as valid.
+	if !validAggregateComparator(payload.Signal, payload.Comparator) {
+		app.badRequestResponse(w, r, fmt.Errorf("comparator %q points the wrong way for signal %q", payload.Comparator, payload.Signal))
+		return
+	}
 	if app.evaluator == nil {
 		app.internalServerError(w, r, errors.New("alerting evaluator not configured"))
 		return

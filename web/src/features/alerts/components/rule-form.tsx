@@ -84,14 +84,18 @@ export function RuleForm({
 
   const isAggregate = draftClass(draft) === "aggregate"
 
-  // Every dispatched preview request carries the sequence number current at
-  // dispatch time. If a newer request has since been dispatched by the time a
-  // response lands, the response is stale (edited-past) and gets dropped
-  // instead of rendering a verdict for values no longer on screen.
+  // Every preview request carries the sequence number of the draft it was built
+  // from. If the draft has changed by the time a response lands, the response is
+  // stale (edited-past) and gets dropped instead of rendering a verdict for
+  // values no longer on screen.
   const previewSeq = useRef(0)
 
   // Debounced preview: only aggregate drafts have a metric to evaluate.
   useEffect(() => {
+    // Bump on every draft change, not at dispatch time: an in-flight request
+    // from the previous draft can land inside the debounce window and would
+    // otherwise still match the sequence.
+    const seq = ++previewSeq.current
     const input = toPreviewInput(draft)
     if (!input) {
       setPreviewResult(null)
@@ -100,7 +104,6 @@ export function RuleForm({
     }
     setPreviewPending(true)
     const timer = setTimeout(() => {
-      const seq = ++previewSeq.current
       preview.mutate(input, {
         onSuccess: (result) => {
           if (seq !== previewSeq.current) return
@@ -109,6 +112,7 @@ export function RuleForm({
         },
         onError: () => {
           if (seq !== previewSeq.current) return
+          setPreviewResult(null)
           setPreviewPending(false)
         },
       })

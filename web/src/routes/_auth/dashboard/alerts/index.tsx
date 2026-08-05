@@ -27,6 +27,11 @@ function AlertsPage() {
   const active = (alerts.data ?? []).filter((a) => a.state !== "resolved")
   const history = (alerts.data ?? []).filter((a) => a.state === "resolved")
 
+  // A rule lookup that never completed (failed, or disabled because the org is
+  // not resolved yet) is not the same as a rule that was deleted, so the table
+  // gets a neutral label rather than claiming every rule is gone.
+  const unknownRuleLabel = rules.isSuccess ? "Deleted rule" : "Rule unavailable"
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -36,7 +41,7 @@ function AlertsPage() {
         </p>
       </div>
 
-      {alerts.isPending ? (
+      {alerts.isPending || rules.isLoading ? (
         <TableSkeleton />
       ) : alerts.isError ? (
         <ErrorState message="Could not load alerts." />
@@ -45,7 +50,11 @@ function AlertsPage() {
           <section className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold tracking-tight">Active</h2>
             {active.length ? (
-              <AlertsTable alerts={active} ruleNames={ruleNames} />
+              <AlertsTable
+                alerts={active}
+                ruleNames={ruleNames}
+                unknownRuleLabel={unknownRuleLabel}
+              />
             ) : (
               <EmptyState
                 title="Nothing firing"
@@ -57,7 +66,11 @@ function AlertsPage() {
           <section className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold tracking-tight">History</h2>
             {history.length ? (
-              <AlertsTable alerts={history} ruleNames={ruleNames} />
+              <AlertsTable
+                alerts={history}
+                ruleNames={ruleNames}
+                unknownRuleLabel={unknownRuleLabel}
+              />
             ) : (
               <EmptyState
                 title="No history yet"

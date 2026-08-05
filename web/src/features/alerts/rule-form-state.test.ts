@@ -172,9 +172,7 @@ describe("window_seconds is never non-positive on the wire", () => {
       recipient: "ops@acme.com",
     }
     const input = toRuleInput(draft)
-    if (input.window_seconds !== undefined) {
-      expect(input.window_seconds).toBeGreaterThan(0)
-    }
+    expect(input.window_seconds).toBeUndefined()
   })
 
   it("toRuleInput omits window_seconds when the draft window is negative", () => {
@@ -186,9 +184,7 @@ describe("window_seconds is never non-positive on the wire", () => {
       recipient: "ops@acme.com",
     }
     const input = toRuleInput(draft)
-    if (input.window_seconds !== undefined) {
-      expect(input.window_seconds).toBeGreaterThan(0)
-    }
+    expect(input.window_seconds).toBeUndefined()
   })
 
   it("toPreviewInput never sends a non-positive window_seconds", () => {
@@ -198,9 +194,7 @@ describe("window_seconds is never non-positive on the wire", () => {
       windowSeconds: 0,
     }
     const input = toPreviewInput(draft)
-    if (input && input.window_seconds !== undefined) {
-      expect(input.window_seconds).toBeGreaterThan(0)
-    }
+    expect(input?.window_seconds).toBeUndefined()
   })
 })
 
