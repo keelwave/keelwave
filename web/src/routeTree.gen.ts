@@ -21,6 +21,7 @@ import { Route as AuthDashboardIndexRouteImport } from './routes/_auth/dashboard
 import { Route as AuthDashboardSettingsRouteRouteImport } from './routes/_auth/dashboard/settings/route'
 import { Route as AuthDashboardAgentsIndexRouteImport } from './routes/_auth/dashboard/agents/index'
 import { Route as AuthDashboardAlertsIndexRouteImport } from './routes/_auth/dashboard/alerts/index'
+import { Route as AuthDashboardAlertsRulesRouteImport } from './routes/_auth/dashboard/alerts/rules'
 import { Route as AuthDashboardRunsIndexRouteImport } from './routes/_auth/dashboard/runs/index'
 import { Route as AuthDashboardRunsRunIdRouteImport } from './routes/_auth/dashboard/runs/$runId'
 import { Route as AuthDashboardSettingsIndexRouteImport } from './routes/_auth/dashboard/settings/index'
@@ -91,6 +92,12 @@ const AuthDashboardAlertsIndexRoute =
     path: '/alerts/',
     getParentRoute: () => AuthDashboardRouteRoute,
   } as any)
+const AuthDashboardAlertsRulesRoute =
+  AuthDashboardAlertsRulesRouteImport.update({
+    id: '/alerts/rules',
+    path: '/alerts/rules',
+    getParentRoute: () => AuthDashboardRouteRoute,
+  } as any)
 const AuthDashboardRunsIndexRoute = AuthDashboardRunsIndexRouteImport.update({
   id: '/runs/',
   path: '/runs/',
@@ -141,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/verify-email/$token': typeof VerifyEmailTokenRoute
   '/dashboard/settings': typeof AuthDashboardSettingsRouteRouteWithChildren
   '/dashboard/': typeof AuthDashboardIndexRoute
+  '/dashboard/alerts/rules': typeof AuthDashboardAlertsRulesRoute
   '/dashboard/runs/$runId': typeof AuthDashboardRunsRunIdRoute
   '/dashboard/agents/': typeof AuthDashboardAgentsIndexRoute
   '/dashboard/alerts/': typeof AuthDashboardAlertsIndexRoute
@@ -159,6 +167,7 @@ export interface FileRoutesByTo {
   '/invite/$token': typeof InviteTokenRoute
   '/verify-email/$token': typeof VerifyEmailTokenRoute
   '/dashboard': typeof AuthDashboardIndexRoute
+  '/dashboard/alerts/rules': typeof AuthDashboardAlertsRulesRoute
   '/dashboard/runs/$runId': typeof AuthDashboardRunsRunIdRoute
   '/dashboard/agents': typeof AuthDashboardAgentsIndexRoute
   '/dashboard/alerts': typeof AuthDashboardAlertsIndexRoute
@@ -181,6 +190,7 @@ export interface FileRoutesById {
   '/verify-email/$token': typeof VerifyEmailTokenRoute
   '/_auth/dashboard/settings': typeof AuthDashboardSettingsRouteRouteWithChildren
   '/_auth/dashboard/': typeof AuthDashboardIndexRoute
+  '/_auth/dashboard/alerts/rules': typeof AuthDashboardAlertsRulesRoute
   '/_auth/dashboard/runs/$runId': typeof AuthDashboardRunsRunIdRoute
   '/_auth/dashboard/agents/': typeof AuthDashboardAgentsIndexRoute
   '/_auth/dashboard/alerts/': typeof AuthDashboardAlertsIndexRoute
@@ -203,6 +213,7 @@ export interface FileRouteTypes {
     | '/verify-email/$token'
     | '/dashboard/settings'
     | '/dashboard/'
+    | '/dashboard/alerts/rules'
     | '/dashboard/runs/$runId'
     | '/dashboard/agents/'
     | '/dashboard/alerts/'
@@ -221,6 +232,7 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/verify-email/$token'
     | '/dashboard'
+    | '/dashboard/alerts/rules'
     | '/dashboard/runs/$runId'
     | '/dashboard/agents'
     | '/dashboard/alerts'
@@ -242,6 +254,7 @@ export interface FileRouteTypes {
     | '/verify-email/$token'
     | '/_auth/dashboard/settings'
     | '/_auth/dashboard/'
+    | '/_auth/dashboard/alerts/rules'
     | '/_auth/dashboard/runs/$runId'
     | '/_auth/dashboard/agents/'
     | '/_auth/dashboard/alerts/'
@@ -348,6 +361,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthDashboardAlertsIndexRouteImport
       parentRoute: typeof AuthDashboardRouteRoute
     }
+    '/_auth/dashboard/alerts/rules': {
+      id: '/_auth/dashboard/alerts/rules'
+      path: '/alerts/rules'
+      fullPath: '/dashboard/alerts/rules'
+      preLoaderRoute: typeof AuthDashboardAlertsRulesRouteImport
+      parentRoute: typeof AuthDashboardRouteRoute
+    }
     '/_auth/dashboard/runs/': {
       id: '/_auth/dashboard/runs/'
       path: '/runs'
@@ -425,6 +445,7 @@ const AuthDashboardSettingsRouteRouteWithChildren =
 interface AuthDashboardRouteRouteChildren {
   AuthDashboardSettingsRouteRoute: typeof AuthDashboardSettingsRouteRouteWithChildren
   AuthDashboardIndexRoute: typeof AuthDashboardIndexRoute
+  AuthDashboardAlertsRulesRoute: typeof AuthDashboardAlertsRulesRoute
   AuthDashboardRunsRunIdRoute: typeof AuthDashboardRunsRunIdRoute
   AuthDashboardAgentsIndexRoute: typeof AuthDashboardAgentsIndexRoute
   AuthDashboardAlertsIndexRoute: typeof AuthDashboardAlertsIndexRoute
@@ -435,6 +456,7 @@ interface AuthDashboardRouteRouteChildren {
 const AuthDashboardRouteRouteChildren: AuthDashboardRouteRouteChildren = {
   AuthDashboardSettingsRouteRoute: AuthDashboardSettingsRouteRouteWithChildren,
   AuthDashboardIndexRoute: AuthDashboardIndexRoute,
+  AuthDashboardAlertsRulesRoute: AuthDashboardAlertsRulesRoute,
   AuthDashboardRunsRunIdRoute: AuthDashboardRunsRunIdRoute,
   AuthDashboardAgentsIndexRoute: AuthDashboardAgentsIndexRoute,
   AuthDashboardAlertsIndexRoute: AuthDashboardAlertsIndexRoute,
