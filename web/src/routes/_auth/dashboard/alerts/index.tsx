@@ -38,10 +38,10 @@ function AlertsPage() {
   const history = (alerts.data ?? []).filter((a) => a.state === "resolved")
 
   return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Alerts</h1>
-        <p className="text-muted-foreground text-sm">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-xl font-semibold tracking-tight">Alerts</h1>
+        <p className="text-sm text-muted-foreground">
           What is firing now, and what fired recently.
         </p>
       </div>
