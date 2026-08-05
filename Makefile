@@ -1,4 +1,4 @@
-.PHONY: run dev build web-build tidy db-up db-down migrate-create migrate-up migrate-down migrate-force migrate-version gen-docs fmt test seed
+.PHONY: run dev build web-build dev-setup dev-unsetup tidy db-up db-down migrate-create migrate-up migrate-down migrate-force migrate-version gen-docs fmt test seed
 
 MIGRATIONS_PATH = ./cmd/migrate/migrations
 DB_ADDR ?= postgres://keelwave:keelwave@localhost:5432/keelwave?sslmode=disable
@@ -16,6 +16,17 @@ build:
 # embeds a real dashboard (otherwise only the placeholder index.html ships).
 web-build:
 	@cd web && pnpm install --frozen-lockfile && pnpm build
+
+# Run once per clone: stop git reporting the placeholder index.html that every
+# web build overwrites.
+dev-setup:
+	@git update-index --skip-worktree internal/web/dist/index.html
+	@echo "skip-worktree set on internal/web/dist/index.html"
+
+# Undo dev-setup. Needed before pulling a change to the placeholder itself.
+dev-unsetup:
+	@git update-index --no-skip-worktree internal/web/dist/index.html
+	@echo "skip-worktree cleared on internal/web/dist/index.html"
 
 tidy:
 	@go mod tidy

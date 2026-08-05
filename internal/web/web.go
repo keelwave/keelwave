@@ -50,6 +50,12 @@ func Handler() http.Handler {
 		}
 
 		if _, err := fs.Stat(sub, upath); err == nil {
+			// Vite content-hashes everything under assets/, so those URLs never
+			// change meaning. embed.FS reports a zero ModTime, so http.FileServer
+			// sends no Last-Modified or ETag and every load refetches without this.
+			if strings.HasPrefix(upath, "assets/") {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			}
 			fileServer.ServeHTTP(w, r)
 			return
 		}
