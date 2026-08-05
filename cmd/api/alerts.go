@@ -447,7 +447,7 @@ func (app *application) previewAlertRuleHandler(w http.ResponseWriter, r *http.R
 	result := alertRulePreviewResult{
 		Value:       value,
 		SampleCount: count,
-		WouldBreach: alerting.Compare(value, payload.Comparator, payload.Threshold),
+		WouldBreach: alerting.Breached(value, count, rule),
 		ScopeLabel:  scope,
 	}
 	if err := app.jsonResponse(w, http.StatusOK, result); err != nil {

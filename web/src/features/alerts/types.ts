@@ -1,4 +1,9 @@
-export type AlertState = "pending" | "firing" | "recovering" | "resolved"
+/**
+ * Mirrors the alert_events.state CHECK constraint. "fired" is the terminal state
+ * event-class alerts (loop, run_failure) land in — they have no window to
+ * recover over, so they never pass through pending/recovering.
+ */
+export type AlertState = "pending" | "firing" | "recovering" | "resolved" | "fired"
 
 export type AlertSignal =
   | "run_failure"

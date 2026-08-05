@@ -36,7 +36,10 @@ func TestAlertRulePreview_AggregateAndRejections(t *testing.T) {
 	assert.Equal(t, 0, preview.Data.SampleCount)
 	assert.False(t, preview.Data.WouldBreach, "0 is not > 5")
 
-	// Threshold below the observed value must flip the verdict.
+	// Preview must apply the engine's data gates, not just the comparator:
+	// run_failure coalesces to a fully healthy 1 on no data, which naively
+	// compares as < 2. With sample_count 0 the engine would not breach, so
+	// neither may the preview.
 	resp, raw = doJSON(t, http.MethodPost, alertPreviewURL(ts), "", map[string]any{
 		"signal":         "run_failure",
 		"comparator":     "<",
@@ -44,7 +47,8 @@ func TestAlertRulePreview_AggregateAndRejections(t *testing.T) {
 		"window_seconds": 300,
 	}, &preview, ts.cookie)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "body=%s", raw)
-	assert.True(t, preview.Data.WouldBreach, "completion rate coalesces to 1, which is < 2")
+	assert.Equal(t, 0, preview.Data.SampleCount)
+	assert.False(t, preview.Data.WouldBreach, "no finished runs is never a breach")
 
 	// Event-class signals have no metric to evaluate.
 	resp, _ = doJSON(t, http.MethodPost, alertPreviewURL(ts), "", map[string]any{

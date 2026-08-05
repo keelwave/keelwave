@@ -13,6 +13,8 @@ export function alertDisplayState(alert: Alert): string {
       return "Pending"
     case "firing":
       return "Firing"
+    case "fired":
+      return "Fired"
     case "recovering":
       return "Recovering"
     case "resolved":
@@ -23,7 +25,7 @@ export function alertDisplayState(alert: Alert): string {
 export function AlertStateBadge({ alert }: { alert: Alert }) {
   const label = alertDisplayState(alert)
   const variant =
-    alert.state === "firing"
+    alert.state === "firing" || alert.state === "fired"
       ? "destructive"
       : alert.state === "pending" || alert.state === "recovering"
         ? "secondary"
