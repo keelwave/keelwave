@@ -1,10 +1,12 @@
 import { useNavigate, Link, useRouterState } from "@tanstack/react-router"
 import {
+  Bell,
   Bot,
   LayoutDashboard,
   ListTree,
   LogOut,
   Settings,
+  SlidersHorizontal,
   Wrench,
 } from "lucide-react"
 
@@ -29,6 +31,11 @@ const NAV = [
   { title: "Agents", to: "/dashboard/agents", icon: Bot },
   { title: "Agent runs", to: "/dashboard/runs", icon: ListTree },
   { title: "Tool analytics", to: "/dashboard/tools", icon: Wrench },
+] as const
+
+const ALERTING_NAV = [
+  { title: "Alerts", to: "/dashboard/alerts", icon: Bell, exact: true },
+  { title: "Rules", to: "/dashboard/alerts/rules", icon: SlidersHorizontal },
 ] as const
 
 const SETTINGS_NAV = [
@@ -67,6 +74,30 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     isActive={
                       item.to === "/dashboard"
+                        ? pathname === item.to
+                        : pathname.startsWith(item.to)
+                    }
+                    tooltip={item.title}
+                    render={<Link to={item.to} />}
+                  >
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Alerting</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {ALERTING_NAV.map((item) => (
+                <SidebarMenuItem key={item.to}>
+                  <SidebarMenuButton
+                    isActive={
+                      "exact" in item
                         ? pathname === item.to
                         : pathname.startsWith(item.to)
                     }

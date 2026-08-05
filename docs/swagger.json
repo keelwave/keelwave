@@ -655,6 +655,74 @@
                 }
             }
         },
+        "/admin/orgs/{orgID}/projects/{projectID}/alert-rules/preview": {
+            "post": {
+                "description": "Evaluates a draft rule's signal over its window right now and reports whether the threshold would breach. Aggregate signals only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin/alert-rules"
+                ],
+                "summary": "Preview an unsaved alert rule",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Organization UUID",
+                        "name": "orgID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project UUID",
+                        "name": "projectID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Draft rule",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.alertRulePreviewPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.alertRulePreviewResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/admin/orgs/{orgID}/projects/{projectID}/alert-rules/{ruleID}": {
             "delete": {
                 "description": "Removes an alert rule and cascades to its alert_events. Requires admin role.",
@@ -2151,6 +2219,67 @@
                     }
                 }
             }
+        },
+        "/projects/{projectID}/alerts/events": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Fired alert instances newest-first, each with its latest notification delivery status. state=active covers pending, firing and recovering.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "alerts"
+                ],
+                "summary": "List alerts for a project",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project UUID",
+                        "name": "projectID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "active | resolved (default: all)",
+                        "name": "state",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "default 50, max 200",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.AlertEventWithDelivery"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -2235,6 +2364,61 @@
                 },
                 "window_seconds": {
                     "type": "integer"
+                }
+            }
+        },
+        "main.alertRulePreviewPayload": {
+            "type": "object",
+            "required": [
+                "comparator",
+                "signal"
+            ],
+            "properties": {
+                "agent_name": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "comparator": {
+                    "type": "string"
+                },
+                "min_requests": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "signal": {
+                    "type": "string",
+                    "enum": [
+                        "run_failure",
+                        "loop",
+                        "termination_shift",
+                        "cost_burn",
+                        "tool_failure",
+                        "duration_p95",
+                        "eval_regression"
+                    ]
+                },
+                "threshold": {
+                    "type": "number"
+                },
+                "window_seconds": {
+                    "type": "integer"
+                }
+            }
+        },
+        "main.alertRulePreviewResult": {
+            "type": "object",
+            "properties": {
+                "sample_count": {
+                    "type": "integer"
+                },
+                "scope_label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
+                },
+                "would_breach": {
+                    "type": "boolean"
                 }
             }
         },
@@ -2830,6 +3014,64 @@
                 },
                 "tool_success": {
                     "type": "boolean"
+                }
+            }
+        },
+        "store.AlertDelivery": {
+            "type": "object",
+            "properties": {
+                "attempts": {
+                    "type": "integer"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "store.AlertEventWithDelivery": {
+            "type": "object",
+            "properties": {
+                "delivery": {
+                    "$ref": "#/definitions/store.AlertDelivery"
+                },
+                "fired_at": {
+                    "type": "string"
+                },
+                "first_breached_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_evaluated_at": {
+                    "type": "string"
+                },
+                "last_fired_at": {
+                    "type": "string"
+                },
+                "last_value": {
+                    "type": "number"
+                },
+                "project_id": {
+                    "type": "string"
+                },
+                "recovering_since": {
+                    "type": "string"
+                },
+                "resolved_at": {
+                    "type": "string"
+                },
+                "rule_id": {
+                    "type": "string"
+                },
+                "scope_label": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
                 }
             }
         },

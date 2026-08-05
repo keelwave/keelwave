@@ -9,28 +9,34 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as CheckEmailRouteImport } from './routes/check-email'
-import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as VerifyEmailTokenRouteImport } from './routes/verify-email/$token'
-import { Route as InviteTokenRouteImport } from './routes/invite/$token'
-import { Route as AuthOnboardingRouteImport } from './routes/_auth/onboarding'
+import { Route as AuthRouteImport } from './routes/_auth'
+import { Route as CheckEmailRouteImport } from './routes/check-email'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthDashboardRouteRouteImport } from './routes/_auth/dashboard/route'
+import { Route as AuthOnboardingRouteImport } from './routes/_auth/onboarding'
+import { Route as InviteTokenRouteImport } from './routes/invite/$token'
+import { Route as VerifyEmailTokenRouteImport } from './routes/verify-email/$token'
 import { Route as AuthDashboardIndexRouteImport } from './routes/_auth/dashboard/index'
 import { Route as AuthDashboardSettingsRouteRouteImport } from './routes/_auth/dashboard/settings/route'
-import { Route as AuthDashboardToolsIndexRouteImport } from './routes/_auth/dashboard/tools/index'
-import { Route as AuthDashboardSettingsIndexRouteImport } from './routes/_auth/dashboard/settings/index'
-import { Route as AuthDashboardRunsIndexRouteImport } from './routes/_auth/dashboard/runs/index'
 import { Route as AuthDashboardAgentsIndexRouteImport } from './routes/_auth/dashboard/agents/index'
+import { Route as AuthDashboardAlertsIndexRouteImport } from './routes/_auth/dashboard/alerts/index'
+import { Route as AuthDashboardAlertsRulesRouteImport } from './routes/_auth/dashboard/alerts/rules'
+import { Route as AuthDashboardRunsIndexRouteImport } from './routes/_auth/dashboard/runs/index'
 import { Route as AuthDashboardRunsRunIdRouteImport } from './routes/_auth/dashboard/runs/$runId'
-import { Route as AuthDashboardSettingsProjectsIndexRouteImport } from './routes/_auth/dashboard/settings/projects/index'
-import { Route as AuthDashboardSettingsOrgIndexRouteImport } from './routes/_auth/dashboard/settings/org/index'
+import { Route as AuthDashboardSettingsIndexRouteImport } from './routes/_auth/dashboard/settings/index'
+import { Route as AuthDashboardToolsIndexRouteImport } from './routes/_auth/dashboard/tools/index'
 import { Route as AuthDashboardSettingsMembersIndexRouteImport } from './routes/_auth/dashboard/settings/members/index'
+import { Route as AuthDashboardSettingsOrgIndexRouteImport } from './routes/_auth/dashboard/settings/org/index'
+import { Route as AuthDashboardSettingsProjectsIndexRouteImport } from './routes/_auth/dashboard/settings/projects/index'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/_auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckEmailRoute = CheckEmailRouteImport.update({
@@ -38,34 +44,30 @@ const CheckEmailRoute = CheckEmailRouteImport.update({
   path: '/check-email',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/_auth',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const VerifyEmailTokenRoute = VerifyEmailTokenRouteImport.update({
-  id: '/verify-email/$token',
-  path: '/verify-email/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InviteTokenRoute = InviteTokenRouteImport.update({
-  id: '/invite/$token',
-  path: '/invite/$token',
-  getParentRoute: () => rootRouteImport,
+const AuthDashboardRouteRoute = AuthDashboardRouteRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthRoute,
 } as any)
 const AuthOnboardingRoute = AuthOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
   getParentRoute: () => AuthRoute,
 } as any)
-const AuthDashboardRouteRoute = AuthDashboardRouteRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AuthRoute,
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyEmailTokenRoute = VerifyEmailTokenRouteImport.update({
+  id: '/verify-email/$token',
+  path: '/verify-email/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthDashboardIndexRoute = AuthDashboardIndexRouteImport.update({
   id: '/',
@@ -78,9 +80,32 @@ const AuthDashboardSettingsRouteRoute =
     path: '/settings',
     getParentRoute: () => AuthDashboardRouteRoute,
   } as any)
-const AuthDashboardToolsIndexRoute = AuthDashboardToolsIndexRouteImport.update({
-  id: '/tools/',
-  path: '/tools/',
+const AuthDashboardAgentsIndexRoute =
+  AuthDashboardAgentsIndexRouteImport.update({
+    id: '/agents/',
+    path: '/agents/',
+    getParentRoute: () => AuthDashboardRouteRoute,
+  } as any)
+const AuthDashboardAlertsIndexRoute =
+  AuthDashboardAlertsIndexRouteImport.update({
+    id: '/alerts/',
+    path: '/alerts/',
+    getParentRoute: () => AuthDashboardRouteRoute,
+  } as any)
+const AuthDashboardAlertsRulesRoute =
+  AuthDashboardAlertsRulesRouteImport.update({
+    id: '/alerts/rules',
+    path: '/alerts/rules',
+    getParentRoute: () => AuthDashboardRouteRoute,
+  } as any)
+const AuthDashboardRunsIndexRoute = AuthDashboardRunsIndexRouteImport.update({
+  id: '/runs/',
+  path: '/runs/',
+  getParentRoute: () => AuthDashboardRouteRoute,
+} as any)
+const AuthDashboardRunsRunIdRoute = AuthDashboardRunsRunIdRouteImport.update({
+  id: '/runs/$runId',
+  path: '/runs/$runId',
   getParentRoute: () => AuthDashboardRouteRoute,
 } as any)
 const AuthDashboardSettingsIndexRoute =
@@ -89,26 +114,15 @@ const AuthDashboardSettingsIndexRoute =
     path: '/',
     getParentRoute: () => AuthDashboardSettingsRouteRoute,
   } as any)
-const AuthDashboardRunsIndexRoute = AuthDashboardRunsIndexRouteImport.update({
-  id: '/runs/',
-  path: '/runs/',
+const AuthDashboardToolsIndexRoute = AuthDashboardToolsIndexRouteImport.update({
+  id: '/tools/',
+  path: '/tools/',
   getParentRoute: () => AuthDashboardRouteRoute,
 } as any)
-const AuthDashboardAgentsIndexRoute =
-  AuthDashboardAgentsIndexRouteImport.update({
-    id: '/agents/',
-    path: '/agents/',
-    getParentRoute: () => AuthDashboardRouteRoute,
-  } as any)
-const AuthDashboardRunsRunIdRoute = AuthDashboardRunsRunIdRouteImport.update({
-  id: '/runs/$runId',
-  path: '/runs/$runId',
-  getParentRoute: () => AuthDashboardRouteRoute,
-} as any)
-const AuthDashboardSettingsProjectsIndexRoute =
-  AuthDashboardSettingsProjectsIndexRouteImport.update({
-    id: '/projects/',
-    path: '/projects/',
+const AuthDashboardSettingsMembersIndexRoute =
+  AuthDashboardSettingsMembersIndexRouteImport.update({
+    id: '/members/',
+    path: '/members/',
     getParentRoute: () => AuthDashboardSettingsRouteRoute,
   } as any)
 const AuthDashboardSettingsOrgIndexRoute =
@@ -117,10 +131,10 @@ const AuthDashboardSettingsOrgIndexRoute =
     path: '/org/',
     getParentRoute: () => AuthDashboardSettingsRouteRoute,
   } as any)
-const AuthDashboardSettingsMembersIndexRoute =
-  AuthDashboardSettingsMembersIndexRouteImport.update({
-    id: '/members/',
-    path: '/members/',
+const AuthDashboardSettingsProjectsIndexRoute =
+  AuthDashboardSettingsProjectsIndexRouteImport.update({
+    id: '/projects/',
+    path: '/projects/',
     getParentRoute: () => AuthDashboardSettingsRouteRoute,
   } as any)
 
@@ -134,8 +148,10 @@ export interface FileRoutesByFullPath {
   '/verify-email/$token': typeof VerifyEmailTokenRoute
   '/dashboard/settings': typeof AuthDashboardSettingsRouteRouteWithChildren
   '/dashboard/': typeof AuthDashboardIndexRoute
+  '/dashboard/alerts/rules': typeof AuthDashboardAlertsRulesRoute
   '/dashboard/runs/$runId': typeof AuthDashboardRunsRunIdRoute
   '/dashboard/agents/': typeof AuthDashboardAgentsIndexRoute
+  '/dashboard/alerts/': typeof AuthDashboardAlertsIndexRoute
   '/dashboard/runs/': typeof AuthDashboardRunsIndexRoute
   '/dashboard/settings/': typeof AuthDashboardSettingsIndexRoute
   '/dashboard/tools/': typeof AuthDashboardToolsIndexRoute
@@ -151,8 +167,10 @@ export interface FileRoutesByTo {
   '/invite/$token': typeof InviteTokenRoute
   '/verify-email/$token': typeof VerifyEmailTokenRoute
   '/dashboard': typeof AuthDashboardIndexRoute
+  '/dashboard/alerts/rules': typeof AuthDashboardAlertsRulesRoute
   '/dashboard/runs/$runId': typeof AuthDashboardRunsRunIdRoute
   '/dashboard/agents': typeof AuthDashboardAgentsIndexRoute
+  '/dashboard/alerts': typeof AuthDashboardAlertsIndexRoute
   '/dashboard/runs': typeof AuthDashboardRunsIndexRoute
   '/dashboard/settings': typeof AuthDashboardSettingsIndexRoute
   '/dashboard/tools': typeof AuthDashboardToolsIndexRoute
@@ -172,8 +190,10 @@ export interface FileRoutesById {
   '/verify-email/$token': typeof VerifyEmailTokenRoute
   '/_auth/dashboard/settings': typeof AuthDashboardSettingsRouteRouteWithChildren
   '/_auth/dashboard/': typeof AuthDashboardIndexRoute
+  '/_auth/dashboard/alerts/rules': typeof AuthDashboardAlertsRulesRoute
   '/_auth/dashboard/runs/$runId': typeof AuthDashboardRunsRunIdRoute
   '/_auth/dashboard/agents/': typeof AuthDashboardAgentsIndexRoute
+  '/_auth/dashboard/alerts/': typeof AuthDashboardAlertsIndexRoute
   '/_auth/dashboard/runs/': typeof AuthDashboardRunsIndexRoute
   '/_auth/dashboard/settings/': typeof AuthDashboardSettingsIndexRoute
   '/_auth/dashboard/tools/': typeof AuthDashboardToolsIndexRoute
@@ -193,8 +213,10 @@ export interface FileRouteTypes {
     | '/verify-email/$token'
     | '/dashboard/settings'
     | '/dashboard/'
+    | '/dashboard/alerts/rules'
     | '/dashboard/runs/$runId'
     | '/dashboard/agents/'
+    | '/dashboard/alerts/'
     | '/dashboard/runs/'
     | '/dashboard/settings/'
     | '/dashboard/tools/'
@@ -210,8 +232,10 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/verify-email/$token'
     | '/dashboard'
+    | '/dashboard/alerts/rules'
     | '/dashboard/runs/$runId'
     | '/dashboard/agents'
+    | '/dashboard/alerts'
     | '/dashboard/runs'
     | '/dashboard/settings'
     | '/dashboard/tools'
@@ -230,8 +254,10 @@ export interface FileRouteTypes {
     | '/verify-email/$token'
     | '/_auth/dashboard/settings'
     | '/_auth/dashboard/'
+    | '/_auth/dashboard/alerts/rules'
     | '/_auth/dashboard/runs/$runId'
     | '/_auth/dashboard/agents/'
+    | '/_auth/dashboard/alerts/'
     | '/_auth/dashboard/runs/'
     | '/_auth/dashboard/settings/'
     | '/_auth/dashboard/tools/'
@@ -251,18 +277,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/check-email': {
-      id: '/check-email'
-      path: '/check-email'
-      fullPath: '/check-email'
-      preLoaderRoute: typeof CheckEmailRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_auth': {
@@ -272,26 +291,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/check-email': {
+      id: '/check-email'
+      path: '/check-email'
+      fullPath: '/check-email'
+      preLoaderRoute: typeof CheckEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/verify-email/$token': {
-      id: '/verify-email/$token'
-      path: '/verify-email/$token'
-      fullPath: '/verify-email/$token'
-      preLoaderRoute: typeof VerifyEmailTokenRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/invite/$token': {
-      id: '/invite/$token'
-      path: '/invite/$token'
-      fullPath: '/invite/$token'
-      preLoaderRoute: typeof InviteTokenRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_auth/dashboard': {
+      id: '/_auth/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthDashboardRouteRouteImport
+      parentRoute: typeof AuthRoute
     }
     '/_auth/onboarding': {
       id: '/_auth/onboarding'
@@ -300,12 +319,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthOnboardingRouteImport
       parentRoute: typeof AuthRoute
     }
-    '/_auth/dashboard': {
-      id: '/_auth/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthDashboardRouteRouteImport
-      parentRoute: typeof AuthRoute
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify-email/$token': {
+      id: '/verify-email/$token'
+      path: '/verify-email/$token'
+      fullPath: '/verify-email/$token'
+      preLoaderRoute: typeof VerifyEmailTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_auth/dashboard/': {
       id: '/_auth/dashboard/'
@@ -321,32 +347,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthDashboardSettingsRouteRouteImport
       parentRoute: typeof AuthDashboardRouteRoute
     }
-    '/_auth/dashboard/tools/': {
-      id: '/_auth/dashboard/tools/'
-      path: '/tools'
-      fullPath: '/dashboard/tools/'
-      preLoaderRoute: typeof AuthDashboardToolsIndexRouteImport
+    '/_auth/dashboard/agents/': {
+      id: '/_auth/dashboard/agents/'
+      path: '/agents'
+      fullPath: '/dashboard/agents/'
+      preLoaderRoute: typeof AuthDashboardAgentsIndexRouteImport
       parentRoute: typeof AuthDashboardRouteRoute
     }
-    '/_auth/dashboard/settings/': {
-      id: '/_auth/dashboard/settings/'
-      path: '/'
-      fullPath: '/dashboard/settings/'
-      preLoaderRoute: typeof AuthDashboardSettingsIndexRouteImport
-      parentRoute: typeof AuthDashboardSettingsRouteRoute
+    '/_auth/dashboard/alerts/': {
+      id: '/_auth/dashboard/alerts/'
+      path: '/alerts'
+      fullPath: '/dashboard/alerts/'
+      preLoaderRoute: typeof AuthDashboardAlertsIndexRouteImport
+      parentRoute: typeof AuthDashboardRouteRoute
+    }
+    '/_auth/dashboard/alerts/rules': {
+      id: '/_auth/dashboard/alerts/rules'
+      path: '/alerts/rules'
+      fullPath: '/dashboard/alerts/rules'
+      preLoaderRoute: typeof AuthDashboardAlertsRulesRouteImport
+      parentRoute: typeof AuthDashboardRouteRoute
     }
     '/_auth/dashboard/runs/': {
       id: '/_auth/dashboard/runs/'
       path: '/runs'
       fullPath: '/dashboard/runs/'
       preLoaderRoute: typeof AuthDashboardRunsIndexRouteImport
-      parentRoute: typeof AuthDashboardRouteRoute
-    }
-    '/_auth/dashboard/agents/': {
-      id: '/_auth/dashboard/agents/'
-      path: '/agents'
-      fullPath: '/dashboard/agents/'
-      preLoaderRoute: typeof AuthDashboardAgentsIndexRouteImport
       parentRoute: typeof AuthDashboardRouteRoute
     }
     '/_auth/dashboard/runs/$runId': {
@@ -356,11 +382,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthDashboardRunsRunIdRouteImport
       parentRoute: typeof AuthDashboardRouteRoute
     }
-    '/_auth/dashboard/settings/projects/': {
-      id: '/_auth/dashboard/settings/projects/'
-      path: '/projects'
-      fullPath: '/dashboard/settings/projects/'
-      preLoaderRoute: typeof AuthDashboardSettingsProjectsIndexRouteImport
+    '/_auth/dashboard/settings/': {
+      id: '/_auth/dashboard/settings/'
+      path: '/'
+      fullPath: '/dashboard/settings/'
+      preLoaderRoute: typeof AuthDashboardSettingsIndexRouteImport
+      parentRoute: typeof AuthDashboardSettingsRouteRoute
+    }
+    '/_auth/dashboard/tools/': {
+      id: '/_auth/dashboard/tools/'
+      path: '/tools'
+      fullPath: '/dashboard/tools/'
+      preLoaderRoute: typeof AuthDashboardToolsIndexRouteImport
+      parentRoute: typeof AuthDashboardRouteRoute
+    }
+    '/_auth/dashboard/settings/members/': {
+      id: '/_auth/dashboard/settings/members/'
+      path: '/members'
+      fullPath: '/dashboard/settings/members/'
+      preLoaderRoute: typeof AuthDashboardSettingsMembersIndexRouteImport
       parentRoute: typeof AuthDashboardSettingsRouteRoute
     }
     '/_auth/dashboard/settings/org/': {
@@ -370,11 +410,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthDashboardSettingsOrgIndexRouteImport
       parentRoute: typeof AuthDashboardSettingsRouteRoute
     }
-    '/_auth/dashboard/settings/members/': {
-      id: '/_auth/dashboard/settings/members/'
-      path: '/members'
-      fullPath: '/dashboard/settings/members/'
-      preLoaderRoute: typeof AuthDashboardSettingsMembersIndexRouteImport
+    '/_auth/dashboard/settings/projects/': {
+      id: '/_auth/dashboard/settings/projects/'
+      path: '/projects'
+      fullPath: '/dashboard/settings/projects/'
+      preLoaderRoute: typeof AuthDashboardSettingsProjectsIndexRouteImport
       parentRoute: typeof AuthDashboardSettingsRouteRoute
     }
   }
@@ -405,8 +445,10 @@ const AuthDashboardSettingsRouteRouteWithChildren =
 interface AuthDashboardRouteRouteChildren {
   AuthDashboardSettingsRouteRoute: typeof AuthDashboardSettingsRouteRouteWithChildren
   AuthDashboardIndexRoute: typeof AuthDashboardIndexRoute
+  AuthDashboardAlertsRulesRoute: typeof AuthDashboardAlertsRulesRoute
   AuthDashboardRunsRunIdRoute: typeof AuthDashboardRunsRunIdRoute
   AuthDashboardAgentsIndexRoute: typeof AuthDashboardAgentsIndexRoute
+  AuthDashboardAlertsIndexRoute: typeof AuthDashboardAlertsIndexRoute
   AuthDashboardRunsIndexRoute: typeof AuthDashboardRunsIndexRoute
   AuthDashboardToolsIndexRoute: typeof AuthDashboardToolsIndexRoute
 }
@@ -414,8 +456,10 @@ interface AuthDashboardRouteRouteChildren {
 const AuthDashboardRouteRouteChildren: AuthDashboardRouteRouteChildren = {
   AuthDashboardSettingsRouteRoute: AuthDashboardSettingsRouteRouteWithChildren,
   AuthDashboardIndexRoute: AuthDashboardIndexRoute,
+  AuthDashboardAlertsRulesRoute: AuthDashboardAlertsRulesRoute,
   AuthDashboardRunsRunIdRoute: AuthDashboardRunsRunIdRoute,
   AuthDashboardAgentsIndexRoute: AuthDashboardAgentsIndexRoute,
+  AuthDashboardAlertsIndexRoute: AuthDashboardAlertsIndexRoute,
   AuthDashboardRunsIndexRoute: AuthDashboardRunsIndexRoute,
   AuthDashboardToolsIndexRoute: AuthDashboardToolsIndexRoute,
 }

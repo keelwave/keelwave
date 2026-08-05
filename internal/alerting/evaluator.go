@@ -49,13 +49,9 @@ func (ev *Evaluator) EvaluateAggregate(ctx context.Context, rule *store.AlertRul
 	if err != nil {
 		return err
 	}
-	// No data (count==0) is never a breach, whatever the comparator direction:
-	// the per-signal coalesce default only reads as "not-breached" in the signal's
-	// natural direction. Below min_requests is likewise not a breach, but we still
-	// run the state machine so a firing alert whose volume drops can recover rather
-	// than freeze in firing.
-	enoughVolume := rule.MinRequests == 0 || count >= rule.MinRequests
-	breached := count > 0 && enoughVolume && compare(value, rule.Comparator, rule.Threshold)
+	// Not breached still runs the state machine, so a firing alert whose volume
+	// drops below min_requests can recover rather than freeze in firing.
+	breached := Breached(value, count, rule)
 	fp := Fingerprint(rule.ID, scope)
 	now := time.Now()
 
@@ -183,6 +179,14 @@ func (ev *Evaluator) persist(ctx context.Context, rule *store.AlertRule, live *s
 	})
 }
 
+// Preview evaluates an unsaved rule's metric exactly as EvaluateAggregate would,
+// without touching alert state. The dashboard uses it so a user can see what a
+// threshold means before saving. It deliberately shares queryMetric with live
+// evaluation — a second query path would drift.
+func (ev *Evaluator) Preview(ctx context.Context, rule *store.AlertRule) (float64, string, int, error) {
+	return ev.queryMetric(ctx, rule)
+}
+
 // queryMetric resolves the rule's observed value, scope_label, and window count
 // (the min_requests denominator).
 //
@@ -295,7 +299,9 @@ func (ev *Evaluator) queryMetric(ctx context.Context, rule *store.AlertRule) (fl
 	}
 }
 
-func compare(value float64, comparator string, threshold float64) bool {
+// Compare is the breach test the live evaluator uses. Exported so preview
+// endpoints can reuse it instead of forking a second comparison function.
+func Compare(value float64, comparator string, threshold float64) bool {
 	switch comparator {
 	case ">":
 		return value > threshold
@@ -308,6 +314,17 @@ func compare(value float64, comparator string, threshold float64) bool {
 	default:
 		return false
 	}
+}
+
+// Breached is the full breach test for an aggregate rule: comparator plus the
+// two data gates. No data (count==0) is never a breach whatever the comparator
+// direction, since the per-signal coalesce default only reads as "not breached"
+// in the signal's natural direction; below min_requests is likewise not a
+// breach. Exported so preview endpoints report exactly what the engine would
+// decide instead of comparing on the raw value.
+func Breached(value float64, count int, rule *store.AlertRule) bool {
+	enoughVolume := rule.MinRequests == 0 || count >= rule.MinRequests
+	return count > 0 && enoughVolume && Compare(value, rule.Comparator, rule.Threshold)
 }
 
 // buildPayload assembles the channel-agnostic alert body stored on the

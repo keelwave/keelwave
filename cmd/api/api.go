@@ -151,6 +151,12 @@ func (app *application) mount() *chi.Mux {
 					r.Get("/{runID}/loops", app.listAgentLoopsHandler)
 				})
 			})
+
+			r.Route("/alerts", func(r chi.Router) {
+				r.Use(app.queryAuthMiddleware)
+				r.Use(app.requireVerifiedMiddleware)
+				r.Get("/events", app.listAlertsHandler)
+			})
 		})
 
 		r.Route("/admin", func(r chi.Router) {
@@ -194,6 +200,7 @@ func (app *application) mount() *chi.Mux {
 							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Post("/", app.createAlertRuleHandler)
 							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Patch("/{ruleID}", app.updateAlertRuleHandler)
 							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Delete("/{ruleID}", app.deleteAlertRuleHandler)
+							r.With(app.requireOrgRoleMiddleware(RoleLevelAdmin)).Post("/preview", app.previewAlertRuleHandler)
 						})
 					})
 				})

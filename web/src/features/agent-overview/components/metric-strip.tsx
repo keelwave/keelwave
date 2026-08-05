@@ -7,6 +7,7 @@ export interface Metric {
   current?: number
   previous?: number
   goodWhen?: "up" | "down"
+  hasData?: boolean
 }
 
 export function MetricStrip({ items }: { items: Metric[] }) {
@@ -24,6 +25,7 @@ export function MetricStrip({ items }: { items: Metric[] }) {
                 current={m.current}
                 previous={m.previous}
                 goodWhen={m.goodWhen}
+                hasData={m.hasData}
               />
             ) : null}
           </CardContent>

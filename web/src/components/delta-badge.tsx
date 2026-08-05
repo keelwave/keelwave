@@ -10,12 +10,17 @@ export function DeltaBadge({
   previous,
   goodWhen,
   isNew = false,
+  hasData = true,
 }: {
   current: number
   previous: number
   goodWhen: "up" | "down"
   isNew?: boolean
+  hasData?: boolean
 }) {
+  if (!hasData) {
+    return <span className="font-mono text-xs text-muted-foreground">—</span>
+  }
   if (!previous) {
     if (isNew) {
       return (

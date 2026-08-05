@@ -126,3 +126,77 @@ func (s *AlertEventStore) ListByProject(ctx context.Context, projectID uuid.UUID
 	}
 	return out, rows.Err()
 }
+
+// AlertDelivery is the latest notification attempt for an alert, flattened for
+// the API. A firing alert whose email bounced still reads "firing" without this.
+type AlertDelivery struct {
+	Status    string  `json:"status"`
+	Attempts  int     `json:"attempts"`
+	LastError *string `json:"last_error,omitempty"`
+}
+
+// AlertEventWithDelivery is an alert plus its most recent notification job.
+type AlertEventWithDelivery struct {
+	AlertEvent
+	Delivery *AlertDelivery `json:"delivery,omitempty"`
+}
+
+// ListByProjectFiltered lists alerts newest-first, optionally narrowed by
+// lifecycle state, with the latest notification job joined per alert. state is
+// "active" (pending|firing|recovering), "resolved", or "" for everything.
+func (s *AlertEventStore) ListByProjectFiltered(ctx context.Context, projectID uuid.UUID, state string, limit int) ([]*AlertEventWithDelivery, error) {
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	var stateFilter string
+	switch state {
+	case "active":
+		stateFilter = ` AND e.state IN ('pending','firing','recovering')`
+	case "resolved":
+		stateFilter = ` AND e.state = 'resolved'`
+	}
+
+	q := `SELECT e.id, e.rule_id, e.project_id, e.fingerprint, e.scope_label, e.state,
+		e.first_breached_at, e.fired_at, e.resolved_at, e.recovering_since,
+		e.last_fired_at, e.last_value, e.last_evaluated_at,
+		j.status, j.attempts, j.last_error
+		FROM alert_events e
+		LEFT JOIN LATERAL (
+			SELECT status, attempts, last_error
+			FROM notification_jobs
+			WHERE alert_event_id = e.id
+			ORDER BY created_at DESC, id DESC
+			LIMIT 1
+		) j ON true
+		WHERE e.project_id = $1` + stateFilter + `
+		ORDER BY e.id DESC LIMIT $2`
+
+	rows, err := s.pool.Query(ctx, q, projectID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]*AlertEventWithDelivery, 0)
+	for rows.Next() {
+		e := &AlertEventWithDelivery{}
+		var status *string
+		var attempts *int
+		var lastErr *string
+		if err := rows.Scan(&e.ID, &e.RuleID, &e.ProjectID, &e.Fingerprint, &e.ScopeLabel,
+			&e.State, &e.FirstBreachedAt, &e.FiredAt, &e.ResolvedAt, &e.RecoveringSince,
+			&e.LastFiredAt, &e.LastValue, &e.LastEvaluatedAt,
+			&status, &attempts, &lastErr); err != nil {
+			return nil, err
+		}
+		if status != nil {
+			d := &AlertDelivery{Status: *status, LastError: lastErr}
+			if attempts != nil {
+				d.Attempts = *attempts
+			}
+			e.Delivery = d
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
