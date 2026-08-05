@@ -157,8 +157,8 @@ export function RuleForm({
 
   return (
     <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
-      <SheetContent className="w-full space-y-5 overflow-y-auto sm:max-w-lg">
-        <SheetHeader>
+      <SheetContent className="w-full gap-5 overflow-y-auto px-4 pb-4 sm:max-w-lg">
+        <SheetHeader className="px-0 pt-4 pb-0">
           <SheetTitle>{editing ? "Edit alert rule" : "New alert rule"}</SheetTitle>
           <SheetDescription>
             Pick what to watch; the rest of the form follows.
@@ -312,7 +312,12 @@ export function RuleForm({
           />
         </div>
 
-        <Button variant="ghost" size="sm" onClick={() => setShowAdvanced((v) => !v)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="self-start"
+          onClick={() => setShowAdvanced((v) => !v)}
+        >
           {showAdvanced ? "Hide advanced" : "Advanced timing"}
         </Button>
 
@@ -359,7 +364,7 @@ export function RuleForm({
           </div>
         ) : null}
 
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="mt-auto flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
