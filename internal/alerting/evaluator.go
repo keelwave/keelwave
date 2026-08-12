@@ -78,7 +78,11 @@ func (ev *Evaluator) EvaluateAggregate(ctx context.Context, rule *store.AlertRul
 // settle fully advances the state machine within one tick. The pure machine takes
 // one edge per call, so a for_seconds=0 rule needs two (inactive->pending,
 // pending->firing) to fire in a single tick. We iterate — projecting the event
-// forward as persist would — until the state settles, keeping the strongest notify.
+// forward as persist would — until the state settles.
+//
+// Notify accumulates rather than coming from the final decision: the fire happens
+// on a middle iteration, and the firing->firing no-op that ends the loop carries
+// no notify. The iteration cap is a runaway guard, not an expectation.
 func settle(rule Rule, evt *Event, e Eval) Decision {
 	notify := ""
 	var d Decision
@@ -101,7 +105,9 @@ func settle(rule Rule, evt *Event, e Eval) Decision {
 
 // projectEvent mirrors persist's field stamping so the next settle iteration sees
 // the event as it would be written: first_breached_at on entry to pending,
-// fired_at on fire, recovering_since on entry to recovering.
+// fired_at on fire, recovering_since on entry to recovering. Each on entry only —
+// re-stamping would restart the clock being measured. The result is scratch;
+// persist does the real write with the same conditions, and the two must agree.
 func projectEvent(prev *Event, d Decision, now time.Time) *Event {
 	next := &Event{State: d.NextState}
 	prevState := "inactive"
