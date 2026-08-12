@@ -151,9 +151,9 @@ Phase 1 follow-ups:
 
 Phase 2 (in flight):
 - [x] 2.1 Agent inspector query API (`/v1/agent/runs`, `/{runID}`, `/{runID}/steps`, `/{runID}/loops`) — TDD-driven, real-Postgres tests
-- [ ] 2.2 Python SDK (`keelwave-python`)
+- [ ] 2.2 Python SDK (`keelwave-py`)
 - [ ] 2.3 Demo agent (looping + clean)
-- [ ] 2.4 TypeScript SDK (`keelwave-ts`)
+- [ ] 2.4 TypeScript SDK (`keelwave-js`)
 - [ ] 2.5 OTLP ingest endpoint (`/v1/otlp/traces` w/ OpenInference)
 - [ ] 2.6 Dashboard MVP (React + Recharts) + view rollups + cursor pagination
 

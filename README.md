@@ -127,8 +127,8 @@ Planned / in progress:
 | Repo | What |
 |---|---|
 | [`keelwave`](https://github.com/keelwave/keelwave) | Core — Go API, TimescaleDB schema, React dashboard (this repo) |
-| [`keelwave-python`](https://github.com/keelwave/keelwave-python) | Python SDK |
-| [`keelwave-ts`](https://github.com/keelwave/keelwave-ts) | TypeScript SDK |
+| [`keelwave-py`](https://github.com/keelwave/keelwave-py) | Python SDK |
+| [`keelwave-js`](https://github.com/keelwave/keelwave-js) | TypeScript SDK |
 
 ## License
 

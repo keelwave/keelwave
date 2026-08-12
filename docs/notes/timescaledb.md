@@ -1,6 +1,6 @@
 # TimescaleDB notes
 
-Working reference for hypertable + columnstore decisions in vigil. Pulled from official TigerData / Timescale docs and verified against our Timescale 2.27.x image.
+Working reference for hypertable + columnstore decisions in keelwave. Pulled from official TigerData / Timescale docs and verified against our Timescale 2.27.x image.
 
 ## What it is
 
@@ -53,7 +53,7 @@ SELECT add_compression_policy('ai_traces', INTERVAL '7 days');
 ```
 More verbose, returns metadata, every guide uses it.
 
-**Vigil uses A.** Our Timescale version supports it; bundling compression into one DDL keeps migrations tighter.
+**Keelwave uses A.** Our Timescale version supports it; bundling compression into one DDL keeps migrations tighter.
 
 ## `tsdb.*` options (full list, docs)
 
@@ -92,7 +92,7 @@ Not metadata. Changes the **on-disk physical layout of compressed chunks**.
 
 Official: *"The columnstore is optimized for 1000 rows per batch per `segmentby` value."*
 
-### Vigil's choices
+### Keelwave's choices
 
 | Table | segmentby | Why |
 |---|---|---|
