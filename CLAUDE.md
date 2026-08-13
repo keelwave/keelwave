@@ -133,7 +133,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` pending
 ### Phase 5 — Ship (week 8)
 - [ ] Single `docker-compose.yml` for self-host
 - Landing page + docs (what it does, quickstart, architecture)
-- GitHub release, MIT license
+- GitHub release, Apache-2.0 license
 - Hosted trial on Fly.io or Railway
 
 ### Post-MVP (v1.1+)
