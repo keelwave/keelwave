@@ -48,8 +48,6 @@ make run                         # start the Go API on :8080  (or `make dev` for
 
 Copy the `kw_...` key that `make seed` prints — that's what the SDK authenticates with. Configuration is read from the environment (`DB_ADDR`, `ADDR`, and mailer settings for alerts); see `.envrc` for the full set.
 
-> Some runtime names are mid-rename from an earlier `vigil` branding. The default local DB user/password/name are all `keelwave` (see `docker-compose.yml`), and the API key prefix is `kw_`.
-
 ### 2. Trace an agent (Python)
 
 ```bash
