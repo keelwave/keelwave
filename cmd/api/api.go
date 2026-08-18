@@ -133,6 +133,17 @@ func (app *application) mount() *chi.Mux {
 			})
 		})
 
+		// Key-scoped reads: the API key resolves the project, so SDKs never
+		// need one. Same handlers as the project-scoped tree below.
+		r.Route("/agent", func(r chi.Router) {
+			r.Use(app.apiKeyAuthMiddleware)
+			r.Route("/runs", func(r chi.Router) {
+				r.Get("/{runID}", app.getAgentRunHandler)
+				r.Get("/{runID}/steps", app.listAgentStepsHandler)
+				r.Get("/{runID}/loops", app.listAgentLoopsHandler)
+			})
+		})
+
 		r.Route("/projects/{projectID}", func(r chi.Router) {
 			r.Route("/agent", func(r chi.Router) {
 				r.Use(app.queryAuthMiddleware)
