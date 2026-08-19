@@ -5,6 +5,15 @@ import type { RunHealthRow } from "@/features/agent-runs/types"
 
 export function AgentPortfolioGrid({ rows }: { rows: RunHealthRow[] }) {
   const sorted = [...rows].sort((a, b) => b.total_runs - a.total_runs)
+  if (sorted.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-sm text-muted-foreground">
+          No agents ran in this window.
+        </CardContent>
+      </Card>
+    )
+  }
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
       {sorted.map((r) => (
@@ -18,6 +27,7 @@ export function AgentPortfolioGrid({ rows }: { rows: RunHealthRow[] }) {
                 current={r.total_runs}
                 previous={r.prev_total_runs ?? 0}
                 goodWhen="up"
+                kind="count"
               />
             </div>
             <span className="font-mono text-2xl font-semibold">

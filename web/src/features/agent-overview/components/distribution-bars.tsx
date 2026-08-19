@@ -15,6 +15,11 @@ export function DistributionBars({
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        {total === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            No steps in this window.
+          </p>
+        ) : null}
         {items.map((i) => {
           const pct = total ? (i.count / total) * 100 : 0
           return (

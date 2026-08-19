@@ -6,6 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { TableEmpty } from "@/components/table-empty"
 import { formatCost, formatPercent, formatTokens } from "@/lib/format"
 import type { RunHealthRow } from "@/features/agent-runs/types"
 
@@ -24,6 +25,9 @@ export function RunHealthTable({ rows }: { rows: RunHealthRow[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
+          {rows.length === 0 ? (
+            <TableEmpty colSpan={6}>No agents ran in this window.</TableEmpty>
+          ) : null}
           {rows.map((r) => (
             <TableRow key={r.agent_name}>
               <TableCell className="font-mono text-sm">

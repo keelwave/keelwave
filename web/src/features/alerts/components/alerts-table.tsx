@@ -6,6 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { TableEmpty } from "@/components/table-empty"
 import { AlertStateBadge } from "@/features/alerts/components/alert-state-badge"
 import { DeliveryBadge } from "@/features/alerts/components/delivery-badge"
 import type { Alert } from "@/features/alerts/types"
@@ -40,6 +41,9 @@ export function AlertsTable({
         </TableRow>
       </TableHeader>
       <TableBody>
+        {alerts.length === 0 ? (
+          <TableEmpty colSpan={6}>No alerts have fired.</TableEmpty>
+        ) : null}
         {alerts.map((alert) => (
           <TableRow key={alert.id}>
             <TableCell className="font-medium">

@@ -7,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { TableEmpty } from "@/components/table-empty"
 import { formatTokens } from "@/lib/format"
 import type { TerminationCount } from "@/features/agent-overview/types"
 
@@ -28,6 +29,9 @@ export function TopFailuresPanel({ rows }: { rows: TerminationCount[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {sorted.length === 0 ? (
+              <TableEmpty colSpan={2}>No failures in this window.</TableEmpty>
+            ) : null}
             {sorted.map((r) => (
               <TableRow key={r.termination_reason}>
                 <TableCell className="font-mono text-sm">

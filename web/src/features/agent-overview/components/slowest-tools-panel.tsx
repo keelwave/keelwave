@@ -7,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { TableEmpty } from "@/components/table-empty"
 import type { ToolStat } from "@/features/agent-tools/types"
 
 export function SlowestToolsPanel({ tools }: { tools: ToolStat[] }) {
@@ -29,6 +30,9 @@ export function SlowestToolsPanel({ tools }: { tools: ToolStat[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {sorted.length === 0 ? (
+              <TableEmpty colSpan={4}>No tool calls in this window.</TableEmpty>
+            ) : null}
             {sorted.map((t) => (
               <TableRow key={t.tool_name}>
                 <TableCell className="font-mono text-sm">

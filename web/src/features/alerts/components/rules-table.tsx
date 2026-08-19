@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { TableEmpty } from "@/components/table-empty"
 import {
   useDeleteAlertRule,
   useUpdateAlertRule,
@@ -58,6 +59,9 @@ export function RulesTable({
         </TableRow>
       </TableHeader>
       <TableBody>
+        {rules.length === 0 ? (
+          <TableEmpty colSpan={7}>No alert rules yet.</TableEmpty>
+        ) : null}
         {rules.map((rule) => (
           <TableRow key={rule.id}>
             <TableCell className="font-medium">{rule.name}</TableCell>
@@ -85,7 +89,11 @@ export function RulesTable({
             {canEdit ? (
               <TableCell>
                 <div className="flex justify-end gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => onEdit(rule)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onEdit(rule)}
+                  >
                     Edit
                   </Button>
                   <AlertDialog

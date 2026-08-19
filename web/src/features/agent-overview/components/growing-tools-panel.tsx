@@ -7,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { TableEmpty } from "@/components/table-empty"
 import { CountTrend } from "@/components/count-trend"
 import { formatTokens } from "@/lib/format"
 import type { ToolStat } from "@/features/agent-tools/types"
@@ -30,6 +31,9 @@ export function GrowingToolsPanel({ tools }: { tools: ToolStat[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {sorted.length === 0 ? (
+              <TableEmpty colSpan={3}>No tool calls in this window.</TableEmpty>
+            ) : null}
             {sorted.map((t) => (
               <TableRow key={t.tool_name}>
                 <TableCell className="font-mono text-sm">
