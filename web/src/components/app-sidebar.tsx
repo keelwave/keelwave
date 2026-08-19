@@ -1,4 +1,6 @@
 import { useNavigate, Link, useRouterState } from "@tanstack/react-router"
+
+import type { TimeWindow } from "@/lib/format"
 import {
   Bell,
   Bot,
@@ -78,7 +80,14 @@ export function AppSidebar() {
                         : pathname.startsWith(item.to)
                     }
                     tooltip={item.title}
-                    render={<Link to={item.to} />}
+                    render={
+                      <Link
+                        to={item.to}
+                        search={(prev: { window?: TimeWindow }) => ({
+                          window: prev.window,
+                        })}
+                      />
+                    }
                   >
                     <item.icon />
                     <span>{item.title}</span>
@@ -102,7 +111,14 @@ export function AppSidebar() {
                         : pathname.startsWith(item.to)
                     }
                     tooltip={item.title}
-                    render={<Link to={item.to} />}
+                    render={
+                      <Link
+                        to={item.to}
+                        search={(prev: { window?: TimeWindow }) => ({
+                          window: prev.window,
+                        })}
+                      />
+                    }
                   >
                     <item.icon />
                     <span>{item.title}</span>
@@ -122,7 +138,14 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     isActive={pathname.startsWith("/dashboard/settings")}
                     tooltip={item.title}
-                    render={<Link to={item.to} />}
+                    render={
+                      <Link
+                        to={item.to}
+                        search={(prev: { window?: TimeWindow }) => ({
+                          window: prev.window,
+                        })}
+                      />
+                    }
                   >
                     <item.icon />
                     <span>{item.title}</span>
