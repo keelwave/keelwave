@@ -281,13 +281,25 @@ func TestAgentRunStore_RunsTimeseries_bucketsByInterval(t *testing.T) {
 	to := base.Add(time.Hour)
 	buckets, err := s.AgentRuns.RunsTimeseries(ctx, p.ID, from, to, "1 hour")
 	require.NoError(t, err)
-	require.Len(t, buckets, 1, "all three runs fall in one hourly bucket")
+	require.Len(t, buckets, 2, "gapfill spans [from, to) even where no runs landed")
 
-	b := buckets[0]
-	assert.Equal(t, 3, b.Total)
-	assert.Equal(t, 2, b.Completed)
-	assert.Equal(t, 1, b.Failed)
-	assert.Equal(t, 1, b.Loop)
+	var withRuns, empty *RunBucket
+	for _, b := range buckets {
+		if b.Total > 0 {
+			withRuns = b
+		} else {
+			empty = b
+		}
+	}
+	require.NotNil(t, withRuns, "all three runs fall in one hourly bucket")
+	assert.Equal(t, 3, withRuns.Total)
+	assert.Equal(t, 2, withRuns.Completed)
+	assert.Equal(t, 1, withRuns.Failed)
+	assert.Equal(t, 1, withRuns.Loop)
+
+	require.NotNil(t, empty, "the runless hour is still reported")
+	assert.Equal(t, 0, empty.Total)
+	assert.Equal(t, 0, empty.Completed)
 }
 
 func TestAgentRunStore_Summary_aggregatesRunsAndPercentiles(t *testing.T) {
@@ -313,14 +325,19 @@ func TestAgentRunStore_Summary_aggregatesRunsAndPercentiles(t *testing.T) {
 	assert.Equal(t, 3, got.TotalRuns)
 	assert.Equal(t, 2, got.CompletedRuns)
 	assert.Equal(t, 1, got.LoopRuns)
-	assert.InDelta(t, 2.0/3.0, got.CompletionRate, 0.001)
-	assert.InDelta(t, 1.0/3.0, got.LoopRate, 0.001)
+	require.NotNil(t, got.CompletionRate)
+	require.NotNil(t, got.LoopRate)
+	assert.InDelta(t, 2.0/3.0, *got.CompletionRate, 0.001)
+	assert.InDelta(t, 1.0/3.0, *got.LoopRate, 0.001)
 	require.NotNil(t, got.AvgCostUSD)
 	assert.InDelta(t, 0.04, *got.AvgCostUSD, 0.001)
-	assert.InDelta(t, 2000.0, got.AvgTokens, 0.001)
+	require.NotNil(t, got.AvgTokens)
+	assert.InDelta(t, 2000.0, *got.AvgTokens, 0.001)
 	assert.Equal(t, 21, got.TotalSteps)     // 5+7+9
-	assert.Equal(t, 300, got.DurationP99Ms) // percentile_disc(0.99) of {100,200,300}
-	assert.Equal(t, 200, got.DurationP50Ms)
+	require.NotNil(t, got.DurationP99Ms)
+	require.NotNil(t, got.DurationP50Ms)
+	assert.Equal(t, 300, *got.DurationP99Ms) // percentile_disc(0.99) of {100,200,300}
+	assert.Equal(t, 200, *got.DurationP50Ms)
 	assert.Equal(t, 1, got.UniqueAgents) // folded in from the same scan
 
 	// All runs sit in the current window; the prior window is empty.
@@ -363,7 +380,10 @@ func TestAgentRunStore_Summary_emptyWindowZeroed(t *testing.T) {
 	got, _, err := s.AgentRuns.SummaryWithPrev(ctx, p.ID, time.Now().Add(-time.Hour), time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, 0, got.TotalRuns)
-	assert.Equal(t, 0, got.DurationP95Ms)
+	assert.Nil(t, got.DurationP95Ms, "no runs means no latency, not 0ms")
+	assert.Nil(t, got.AvgTokens)
+	assert.Nil(t, got.CompletionRate)
+	assert.Nil(t, got.LoopRate)
 	assert.Nil(t, got.AvgCostUSD)
 }
 
@@ -395,7 +415,7 @@ func TestAgentRunStore_TerminationCounts_groupsCoalescingNull(t *testing.T) {
 	assert.Equal(t, 1, m["unknown"])
 }
 
-func TestAgentRunStore_RunsTimeseries_returnsEmptySliceNotNil(t *testing.T) {
+func TestAgentRunStore_RunsTimeseries_zeroFillsRunlessWindow(t *testing.T) {
 	ctx := context.Background()
 	s := testStorage(t)
 	p := testProject(t, s, "timeseries-empty")
@@ -404,5 +424,12 @@ func TestAgentRunStore_RunsTimeseries_returnsEmptySliceNotNil(t *testing.T) {
 		time.Now().Add(-time.Hour), time.Now().Add(time.Hour), "1 hour")
 	require.NoError(t, err)
 	require.NotNil(t, buckets)
-	assert.Len(t, buckets, 0)
+	require.NotEmpty(t, buckets, "gapfill reports every bucket, runs or not")
+
+	for _, b := range buckets {
+		assert.Equal(t, 0, b.Total)
+		assert.Equal(t, 0, b.Completed)
+		assert.Equal(t, 0, b.Failed)
+		assert.Equal(t, 0, b.Loop)
+	}
 }

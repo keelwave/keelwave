@@ -119,7 +119,13 @@ func TestRunsTimeseriesHandler_returns200Bucketed(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, resp.StatusCode, "body=%s", raw)
 	require.NotEmpty(t, body.Data)
-	assert.GreaterOrEqual(t, body.Data[0].Total, 1)
+
+	// gapfill returns every bucket in the window, so the run may sit in any of them
+	total := 0
+	for _, b := range body.Data {
+		total += b.Total
+	}
+	assert.GreaterOrEqual(t, total, 1)
 }
 
 func TestRunsTimeseriesHandler_rejectsBadBucket(t *testing.T) {

@@ -245,8 +245,7 @@ func (s *AgentRunStore) RunHealth(ctx context.Context, projectID uuid.UUID, from
 		); err != nil {
 			return nil, err
 		}
-		r.CompletionRate = float64(r.CompletedRuns) / float64(r.TotalRuns)
-		r.LoopRate = float64(r.LoopRuns) / float64(r.TotalRuns)
+		r.computeRates()
 		out = append(out, r)
 	}
 	return out, rows.Err()
@@ -256,24 +255,46 @@ type RunSummary struct {
 	TotalRuns      int      `json:"total_runs"`
 	CompletedRuns  int      `json:"completed_runs"`
 	LoopRuns       int      `json:"loop_runs"`
-	CompletionRate float64  `json:"completion_rate"`
-	LoopRate       float64  `json:"loop_rate"`
+	CompletionRate *float64 `json:"completion_rate,omitempty"`
+	LoopRate       *float64 `json:"loop_rate,omitempty"`
 	AvgCostUSD     *float64 `json:"avg_cost_usd,omitempty"`
-	AvgTokens      float64  `json:"avg_tokens"`
+	AvgTokens      *float64 `json:"avg_tokens,omitempty"`
 	TotalSteps     int      `json:"total_steps"`
-	DurationP50Ms  int      `json:"duration_p50_ms"`
-	DurationP95Ms  int      `json:"duration_p95_ms"`
-	DurationP99Ms  int      `json:"duration_p99_ms"`
+	DurationP50Ms  *int     `json:"duration_p50_ms,omitempty"`
+	DurationP95Ms  *int     `json:"duration_p95_ms,omitempty"`
+	DurationP99Ms  *int     `json:"duration_p99_ms,omitempty"`
 	TotalToolCalls int      `json:"total_tool_calls"`
 	UniqueTools    int      `json:"unique_tools"`
 	UniqueAgents   int      `json:"unique_agents"`
 }
 
-func (r *RunSummary) computeRates() {
-	if r.TotalRuns > 0 {
-		r.CompletionRate = float64(r.CompletedRuns) / float64(r.TotalRuns)
-		r.LoopRate = float64(r.LoopRuns) / float64(r.TotalRuns)
+// rates returns nil when the window holds no runs: 0 means runs happened and
+// none completed, which is a different answer from having nothing to measure.
+func rates(total, completed, loop int) (*float64, *float64) {
+	if total == 0 {
+		return nil, nil
 	}
+	c := float64(completed) / float64(total)
+	l := float64(loop) / float64(total)
+	return &c, &l
+}
+
+// Averages and percentiles arrive coalesced to 0 from SQL; clear them on an
+// empty window so 0ms does not pass for a measurement.
+func (r *RunSummary) computeRates() {
+	r.CompletionRate, r.LoopRate = rates(r.TotalRuns, r.CompletedRuns, r.LoopRuns)
+	if r.TotalRuns == 0 {
+		r.AvgTokens, r.DurationP50Ms, r.DurationP95Ms, r.DurationP99Ms = nil, nil, nil, nil
+	}
+}
+
+// RunHealth's HAVING clause guarantees a run per row, so these never go nil.
+func (r *RunHealthRow) computeRates() {
+	if r.TotalRuns == 0 {
+		return
+	}
+	r.CompletionRate = float64(r.CompletedRuns) / float64(r.TotalRuns)
+	r.LoopRate = float64(r.LoopRuns) / float64(r.TotalRuns)
 }
 
 // SummaryWithPrev aggregates run outcomes, duration percentiles, and unique
@@ -376,20 +397,20 @@ type RunBucket struct {
 	Loop      int       `json:"loop"`
 }
 
-// RunsTimeseries buckets runs into fixed intervals via TimescaleDB time_bucket,
-// counting outcomes per bucket. interval is a Postgres interval literal
-// (e.g. "1 hour"); the caller validates it against an allowlist. Buckets with
-// no runs are omitted — the chart renders gaps.
+// RunsTimeseries buckets runs into fixed intervals via TimescaleDB
+// time_bucket_gapfill, counting outcomes per bucket. interval is a Postgres
+// interval literal (e.g. "1 hour"); the caller validates it against an
+// allowlist. Every bucket in [from, to) is returned; empty ones carry zeroes.
 func (s *AgentRunStore) RunsTimeseries(ctx context.Context, projectID uuid.UUID, from, to time.Time, interval string) ([]*RunBucket, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
 	const q = `
-		SELECT time_bucket($4::interval, timestamp)            AS bucket,
-		       count(*)::int                                   AS total,
-		       count(*) FILTER (WHERE status = 'completed')::int AS completed,
-		       count(*) FILTER (WHERE status = 'failed')::int    AS failed,
-		       count(*) FILTER (WHERE loop_detected)::int        AS loop
+		SELECT time_bucket_gapfill($4::interval, timestamp, $2::timestamptz, $3::timestamptz) AS bucket,
+		       coalesce(count(*), 0)::int                                      AS total,
+		       coalesce(count(*) FILTER (WHERE status = 'completed'), 0)::int   AS completed,
+		       coalesce(count(*) FILTER (WHERE status = 'failed'), 0)::int      AS failed,
+		       coalesce(count(*) FILTER (WHERE loop_detected), 0)::int          AS loop
 		FROM agent_runs
 		WHERE project_id = $1 AND timestamp >= $2 AND timestamp < $3
 		GROUP BY bucket
