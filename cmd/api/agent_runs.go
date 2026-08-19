@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -360,6 +361,16 @@ var bucketIntervals = map[string]string{
 	"1d": "1 day",
 }
 
+var bucketWidths = map[string]time.Duration{
+	"1h": time.Hour,
+	"6h": 6 * time.Hour,
+	"1d": 24 * time.Hour,
+}
+
+// Gapfill emits a row per bucket, so response size is (window / bucket) and
+// the caller picks both.
+const maxTimeseriesBuckets = 1500
+
 // RunsTimeseries godoc
 //
 //	@Summary		Bucketed run counts over time for the calling project
@@ -391,6 +402,13 @@ func (app *application) runsTimeseriesHandler(w http.ResponseWriter, r *http.Req
 	interval, ok := bucketIntervals[bucket]
 	if !ok {
 		app.badRequestResponse(w, r, errors.New("bucket must be one of: 1h, 6h, 1d"))
+		return
+	}
+
+	if n := params.To.Sub(params.From) / bucketWidths[bucket]; n > maxTimeseriesBuckets {
+		app.badRequestResponse(w, r, fmt.Errorf(
+			"window of %d %s buckets exceeds the %d limit; widen bucket or shorten the range",
+			n, bucket, maxTimeseriesBuckets))
 		return
 	}
 
