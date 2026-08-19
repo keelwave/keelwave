@@ -1,57 +1,56 @@
-import { TrendingDown, TrendingUp } from "lucide-react"
+import { Minus, TrendingDown, TrendingUp } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
 const GOOD = "text-emerald-600 dark:text-emerald-400"
 const BAD = "text-red-600 dark:text-red-400"
+const MUTED = "font-mono text-xs text-muted-foreground"
+
+export type MetricKind = "count" | "rate" | "currency"
+
+// Absolute change, not a ratio: percent change is undefined at a zero baseline
+// and ambiguous on a metric that is itself a percentage.
+function formatDelta(delta: number, kind: MetricKind): string {
+  const sign = delta > 0 ? "+" : "−"
+  const abs = Math.abs(delta)
+  switch (kind) {
+    case "rate":
+      return `${sign}${(abs * 100).toFixed(1)}pp`
+    case "currency":
+      return `${sign}$${abs.toFixed(abs < 1 ? 3 : 2)}`
+    default:
+      return `${sign}${Number.isInteger(abs) ? abs.toLocaleString("en-US") : abs.toFixed(1)}`
+  }
+}
 
 export function DeltaBadge({
   current,
   previous,
   goodWhen,
-  isNew = false,
-  hasData = true,
+  kind = "rate",
 }: {
-  current: number
-  previous: number
+  current: number | null | undefined
+  previous: number | null | undefined
   goodWhen: "up" | "down"
-  isNew?: boolean
-  hasData?: boolean
+  kind?: MetricKind
 }) {
-  if (!hasData) {
-    return <span className="font-mono text-xs text-muted-foreground">—</span>
+  if (current == null || previous == null) {
+    return <span className={MUTED}>—</span>
   }
-  if (!previous) {
-    if (isNew) {
-      return (
-        <span className="font-mono text-xs text-muted-foreground">new</span>
-      )
-    }
-    if (!current) {
-      return <span className="font-mono text-xs text-muted-foreground">—</span>
-    }
-    const good = goodWhen === "up"
+
+  const delta = current - previous
+  if (delta === 0) {
     return (
-      <span
-        className={cn(
-          "inline-flex items-center gap-0.5 font-mono text-xs",
-          good ? GOOD : BAD
-        )}
-        title="rose from zero"
-      >
-        <TrendingUp className="size-3" />
+      <span className={cn(MUTED, "inline-flex items-center gap-0.5")}>
+        <Minus className="size-3" />
+        {formatDelta(0, kind).replace("−", "")}
       </span>
     )
   }
-  const pct = ((current - previous) / previous) * 100
-  const up = pct >= 0
+
+  const up = delta > 0
   const good = (up && goodWhen === "up") || (!up && goodWhen === "down")
   const Icon = up ? TrendingUp : TrendingDown
-
-  const label =
-    Math.abs(pct) > 999
-      ? `${up ? ">+" : "<-"}999%`
-      : `${up ? "+" : ""}${pct.toFixed(1)}%`
   return (
     <span
       className={cn(
@@ -60,7 +59,7 @@ export function DeltaBadge({
       )}
     >
       <Icon className="size-3" />
-      {label}
+      {formatDelta(delta, kind)}
     </span>
   )
 }

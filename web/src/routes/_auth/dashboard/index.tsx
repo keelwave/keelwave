@@ -45,7 +45,8 @@ function OverviewPage() {
   const { from, bucket } = useTimeWindow()
   const { tab } = Route.useSearch()
   const navigate = Route.useNavigate()
-  const { currentProjectId, isLoadingProject, hasNoProjects } = useCurrentProject()
+  const { currentProjectId, isLoadingProject, hasNoProjects } =
+    useCurrentProject()
 
   const summary = useSummary(currentProjectId, from)
   const tools = useToolStats(currentProjectId, from)
@@ -133,8 +134,7 @@ function OverviewPage() {
 
 function performanceMetrics(s: SummaryResponse): Metric[] {
   const c = s.current,
-  p = s.previous
-  const hasRuns = c.total_runs > 0
+    p = s.previous
   return [
     {
       label: "Total runs",
@@ -142,7 +142,7 @@ function performanceMetrics(s: SummaryResponse): Metric[] {
       current: c.total_runs,
       previous: p.total_runs,
       goodWhen: "up",
-      hasData: hasRuns,
+      kind: "count",
     },
     {
       label: "Completion",
@@ -150,7 +150,6 @@ function performanceMetrics(s: SummaryResponse): Metric[] {
       current: c.completion_rate,
       previous: p.completion_rate,
       goodWhen: "up",
-      hasData: hasRuns,
     },
     {
       label: "Loop rate",
@@ -158,15 +157,14 @@ function performanceMetrics(s: SummaryResponse): Metric[] {
       current: c.loop_rate,
       previous: p.loop_rate,
       goodWhen: "down",
-      hasData: hasRuns,
     },
     {
       label: "Avg cost",
       value: formatCost(c.avg_cost_usd),
-      current: c.avg_cost_usd ?? 0,
-      previous: p.avg_cost_usd ?? 0,
+      current: c.avg_cost_usd,
+      previous: p.avg_cost_usd,
       goodWhen: "down",
-      hasData: hasRuns && c.avg_cost_usd != null && p.avg_cost_usd != null,
+      kind: "currency",
     },
   ]
 }
@@ -182,10 +180,9 @@ function durationMetrics(s: SummaryResponse) {
 
 function analyticsMetrics(s: SummaryResponse): Metric[] {
   const c = s.current,
-  p = s.previous
-  const stepsPerRun = c.total_runs ? c.total_steps / c.total_runs : 0
-  const prevStepsPerRun = p.total_runs ? p.total_steps / p.total_runs : 0
-  const hasRuns = c.total_runs > 0
+    p = s.previous
+  const stepsPerRun = c.total_runs ? c.total_steps / c.total_runs : null
+  const prevStepsPerRun = p.total_runs ? p.total_steps / p.total_runs : null
   return [
     {
       label: "Unique tools",
@@ -193,7 +190,7 @@ function analyticsMetrics(s: SummaryResponse): Metric[] {
       current: c.unique_tools,
       previous: p.unique_tools,
       goodWhen: "up",
-      hasData: hasRuns,
+      kind: "count",
     },
     {
       label: "Unique agents",
@@ -201,7 +198,7 @@ function analyticsMetrics(s: SummaryResponse): Metric[] {
       current: c.unique_agents,
       previous: p.unique_agents,
       goodWhen: "up",
-      hasData: hasRuns,
+      kind: "count",
     },
     {
       label: "Tool calls",
@@ -209,15 +206,15 @@ function analyticsMetrics(s: SummaryResponse): Metric[] {
       current: c.total_tool_calls,
       previous: p.total_tool_calls,
       goodWhen: "up",
-      hasData: hasRuns,
+      kind: "count",
     },
     {
       label: "Steps / run",
-      value: stepsPerRun.toFixed(1),
+      value: stepsPerRun == null ? "—" : stepsPerRun.toFixed(1),
       current: stepsPerRun,
       previous: prevStepsPerRun,
       goodWhen: "down",
-      hasData: hasRuns,
+      kind: "count",
     },
   ]
 }

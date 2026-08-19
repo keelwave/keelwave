@@ -1,13 +1,14 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { DeltaBadge } from "@/components/delta-badge"
+import type { MetricKind } from "@/components/delta-badge"
 
 export interface Metric {
   label: string
   value: string
-  current?: number
-  previous?: number
+  current?: number | null
+  previous?: number | null
   goodWhen?: "up" | "down"
-  hasData?: boolean
+  kind?: MetricKind
 }
 
 export function MetricStrip({ items }: { items: Metric[] }) {
@@ -20,12 +21,12 @@ export function MetricStrip({ items }: { items: Metric[] }) {
             <span className="font-mono text-xl font-semibold tracking-tight">
               {m.value}
             </span>
-            {m.current != null && m.previous != null && m.goodWhen ? (
+            {m.goodWhen ? (
               <DeltaBadge
                 current={m.current}
                 previous={m.previous}
                 goodWhen={m.goodWhen}
-                hasData={m.hasData}
+                kind={m.kind}
               />
             ) : null}
           </CardContent>

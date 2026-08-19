@@ -65,8 +65,8 @@ export interface RunHealthRow {
   total_runs: number
   completed_runs: number
   loop_runs: number
-  completion_rate: number
-  loop_rate: number
+  completion_rate: number | null
+  loop_rate: number | null
   avg_cost_usd?: number
   avg_tokens: number
   prev_total_runs?: number
