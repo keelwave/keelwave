@@ -2,10 +2,13 @@ package store
 
 import (
 	"context"
+	"maps"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -251,6 +254,125 @@ func TestAgentRunStore_RunHealth_returnsEmptySliceNotNil(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, rows)
 	assert.Len(t, rows, 0)
+}
+
+func rawRunTotals(t *testing.T, id uuid.UUID) (int, *float64) {
+	t.Helper()
+	var tokens int
+	var cost *float64
+	require.NoError(t, testPool.QueryRow(context.Background(),
+		`SELECT total_tokens, total_cost_usd FROM agent_runs WHERE id = $1`, id,
+	).Scan(&tokens, &cost))
+	return tokens, cost
+}
+
+func TestAgentRunStore_Finish_prefersTraceTotalsOverReported(t *testing.T) {
+	ctx := context.Background()
+	s := testStorage(t)
+	p := testProject(t, s, "finish-traces")
+
+	run := &AgentRun{ProjectID: p.ID, AgentName: "a", Status: "running"}
+	require.NoError(t, s.AgentRuns.Insert(ctx, run))
+	traceTokens, traceCost := 1500, 0.03
+	require.NoError(t, s.AITraces.Insert(ctx, &AITrace{
+		ProjectID: p.ID, Model: "test", Status: "success",
+		AgentRunID: &run.ID, TotalTokens: &traceTokens, CostUSD: &traceCost,
+		Timestamp: run.Timestamp,
+	}))
+
+	reported := 0.001
+	require.NoError(t, s.AgentRuns.Finish(ctx, run.ID, run.Timestamp, AgentRunFinish{
+		Status: "completed", TotalTokens: 7, TotalCostUSD: &reported,
+	}))
+
+	tokens, cost := rawRunTotals(t, run.ID)
+	assert.Equal(t, 1500, tokens, "trace sum must win over SDK-reported tokens")
+	require.NotNil(t, cost)
+	assert.InDelta(t, 0.03, *cost, 1e-9, "trace sum must win over SDK-reported cost")
+}
+
+func TestAgentRunStore_Finish_keepsReportedTotalsWithoutTraces(t *testing.T) {
+	ctx := context.Background()
+	s := testStorage(t)
+	p := testProject(t, s, "finish-no-traces")
+
+	run := &AgentRun{ProjectID: p.ID, AgentName: "a", Status: "running"}
+	require.NoError(t, s.AgentRuns.Insert(ctx, run))
+
+	reported := 0.001
+	require.NoError(t, s.AgentRuns.Finish(ctx, run.ID, run.Timestamp, AgentRunFinish{
+		Status: "completed", TotalTokens: 7, TotalCostUSD: &reported,
+	}))
+
+	tokens, cost := rawRunTotals(t, run.ID)
+	assert.Equal(t, 7, tokens)
+	require.NotNil(t, cost)
+	assert.InDelta(t, 0.001, *cost, 1e-9)
+}
+
+// Compressed chunks make the planner pick a parallel ChunkAppend; a correlated
+// subquery under a partial aggregate then fails with "subplan was not
+// initialized". This pins the compressed + parallel path for RunHealth.
+func TestAgentRunStore_RunHealth_survivesCompressedChunkWithParallelPlan(t *testing.T) {
+	ctx := context.Background()
+
+	addr := os.Getenv("TEST_DB_ADDR")
+	if addr == "" {
+		addr = "postgres://keelwave:keelwave@localhost:5432/keelwave?sslmode=disable"
+	}
+	cfg, err := pgxpool.ParseConfig(addr)
+	require.NoError(t, err)
+	maps.Copy(cfg.ConnConfig.RuntimeParams, map[string]string{
+		"parallel_setup_cost":             "0",
+		"parallel_tuple_cost":             "0",
+		"min_parallel_table_scan_size":    "0",
+		"min_parallel_index_scan_size":    "0",
+		"max_parallel_workers_per_gather": "2",
+	})
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	require.NoError(t, err)
+	t.Cleanup(pool.Close)
+
+	s := NewStorage(pool)
+	p := testProject(t, s, "runhealth-compressed")
+
+	base := time.Date(2021, 3, 1, 12, 0, 0, 0, time.UTC)
+	for i := range 20 {
+		name := "alpha"
+		if i%2 == 1 {
+			name = "beta"
+		}
+		run := &AgentRun{
+			ProjectID: p.ID, AgentName: name, Status: "running",
+			Timestamp: base.Add(time.Duration(i) * time.Minute),
+		}
+		require.NoError(t, s.AgentRuns.Insert(ctx, run))
+		tokens, cost := 100*(i+1), 0.01*float64(i+1)
+		require.NoError(t, s.AITraces.Insert(ctx, &AITrace{
+			ProjectID: p.ID, Model: "test", Status: "success",
+			AgentRunID: &run.ID, TotalTokens: &tokens, CostUSD: &cost,
+			Timestamp: run.Timestamp,
+		}))
+		require.NoError(t, s.AgentRuns.Finish(ctx, run.ID, run.Timestamp, AgentRunFinish{Status: "completed"}))
+	}
+
+	const chunkRange = `show_chunks($1::regclass, older_than => '2021-04-01'::timestamptz, newer_than => '2021-02-01'::timestamptz)`
+	for _, table := range []string{"agent_runs", "ai_traces"} {
+		_, err := pool.Exec(ctx, `SELECT compress_chunk(c, if_not_compressed => true) FROM `+chunkRange+` c`, table)
+		require.NoError(t, err, "compress %s", table)
+		t.Cleanup(func() {
+			_, _ = pool.Exec(ctx, `SELECT decompress_chunk(c, if_compressed => true) FROM `+chunkRange+` c`, table)
+		})
+	}
+
+	rows, err := s.AgentRuns.RunHealth(ctx, p.ID, base.Add(-time.Hour), base.Add(time.Hour))
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+	for _, r := range rows {
+		assert.Equal(t, 10, r.TotalRuns, r.AgentName)
+		require.NotNil(t, r.AvgCostUSD, r.AgentName)
+		assert.Greater(t, r.AvgTokens, 0.0, r.AgentName)
+	}
 }
 
 func TestAgentRunStore_RunsTimeseries_bucketsByInterval(t *testing.T) {
