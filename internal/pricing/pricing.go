@@ -6,7 +6,7 @@
 // Catalog source: LiteLLM's model_prices_and_context_window.json (chat models),
 // converted to USD per 1,000,000 tokens. Regenerate rates.json on price changes.
 // A DB-backed catalog with per-project overrides and effective-date versioning
-// is the planned upgrade — see docs/notes/cost-pricing.md (T-030).
+// is the planned upgrade.
 package pricing
 
 import (

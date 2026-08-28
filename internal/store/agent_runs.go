@@ -72,7 +72,7 @@ func (s *AgentRunStore) ListByProject(ctx context.Context, projectID uuid.UUID, 
 
 	// total_tokens / total_cost_usd are maintained at write time (trigger on
 	// ai_traces insert + Finish), preferring linked-trace sums over SDK-reported
-	// values. See docs/notes/cost-pricing.md.
+	// values.
 	const q = `
 		SELECT id, timestamp, project_id, agent_name, status,
 		       termination_reason, loop_detected, loop_step_index,

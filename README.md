@@ -98,7 +98,7 @@ The alerting engine turns noisy agent signals into a small number of trustworthy
 
 It's built to not spam you. A state machine with hysteresis (`for` / `keep_firing_for`) fires **once when a condition starts and once when it's over**, never in between, and a no-data window never fires. Event alerts (a run looped, a run failed) fire once per cooldown window instead of once per run. Detection and delivery are decoupled through a transactional outbox, so a flaky mail provider never blocks evaluation or silently drops an alert.
 
-Email (via Resend) is the delivery channel today; Slack, webhook, and PagerDuty are the planned next channels. For a full walkthrough of the design, see [`docs/notes/alerting-engine.md`](docs/notes/alerting-engine.md).
+Email (via Resend) is the delivery channel today; Slack, webhook, and PagerDuty are the planned next channels.
 
 ## Status & roadmap
 
@@ -118,7 +118,7 @@ Planned / in progress:
 - OpenTelemetry / OTLP ingest.
 - A hosted cloud tier.
 
-**Scope note:** keelwave is intentionally focused on **AI agents**, not general systems monitoring. There is dormant, tested ingest for HTTP events and host metrics in the codebase, but it is not part of the product surface today — see [`docs/notes/scope.md`](docs/notes/scope.md).
+**Scope note:** keelwave is intentionally focused on **AI agents**, not general systems monitoring. There is dormant, tested ingest for HTTP events and host metrics in the codebase, but it is not part of the product surface today.
 
 ## Related repositories
 
