@@ -14,6 +14,7 @@ import "net/http"
 func (app *application) healthHandler(w http.ResponseWriter, r *http.Request) {
 	data := map[string]string{
 		"status":  "ok",
+		"service": "keelwave",
 		"version": version,
 		"env":     app.config.env,
 	}
